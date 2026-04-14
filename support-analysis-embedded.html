@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Служба поддержки — отчёт (данные встроены)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --card: #151b24;
+      --text: #e8edf4;
+      --muted: #8b95a5;
+      --accent: #4da3ff;
+      --accent2: #a78bfa;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 28px 24px 48px;
+      line-height: 1.55;
+    }
+    h1 {
+      font-size: 1.65rem;
+      font-weight: 650;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.02em;
+    }
+    .sub { color: var(--muted); font-size: 0.92rem; margin-bottom: 20px; max-width: 720px; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 22px;
+      padding: 14px 16px;
+      background: var(--card);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .toolbar label.file-btn {
+      cursor: pointer;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: none;
+    }
+    .toolbar input[type=file] { display: none; }
+    button.secondary {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button.secondary:hover { background: rgba(255,255,255,0.12); }
+    .hint { font-size: 0.82rem; color: var(--muted); }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .kpi .v { font-size: 1.45rem; font-weight: 700; color: var(--accent); }
+    .kpi .l { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi .delta { font-size: 0.8rem; margin-top: 4px; }
+    .kpi .delta.up { color: var(--bad); }
+    .kpi .delta.down { color: var(--good); }
+    .kpi .delta.neutral { color: var(--muted); }
+    .section-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 28px 0 12px 0;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 18px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .card h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 8px 0; }
+    .card p.desc { color: var(--muted); font-size: 0.86rem; margin: 0 0 16px 0; }
+    .chart-wrap { position: relative; height: 300px; }
+    .chart-wrap.tall { height: 360px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { color: var(--muted); font-weight: 500; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; background: rgba(77,163,255,0.15); }
+    .insight {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: rgba(52,211,153,0.08);
+      border-left: 3px solid var(--good);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.88rem;
+    }
+    .insight.warn { background: rgba(251,191,36,0.08); border-color: var(--warn); }
+    .insight.bad { background: rgba(248,113,113,0.08); border-color: var(--bad); }
+  </style>
+</head>
+<body>
+<script>window.__EMBEDDED_SUPPORT_ROWS__ = [{"id":"MCA-69","created":"2024-10-28T08:48:52.569000","resolved":"2024-10-29T10:59:35.983000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-70","created":"2024-10-29T08:50:45.349000","resolved":"2024-10-29T10:59:34.169000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-71","created":"2024-10-29T09:34:42.511000","resolved":"2024-10-29T10:13:20.495000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-72","created":"2024-10-29T09:35:29.691000","resolved":"2024-10-29T14:17:27.151000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-73","created":"2024-10-29T09:35:53.389000","resolved":"2024-10-30T11:27:58.190000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-74","created":"2024-10-29T09:39:35.630000","resolved":"2024-11-02T11:37:28.580000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-75","created":"2024-10-29T10:02:24.556000","resolved":"2024-11-02T14:23:22.382000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-76","created":"2024-10-29T10:17:56.596000","resolved":"2024-11-11T13:20:13.722000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-77","created":"2024-10-29T10:20:58.573000","resolved":"2025-02-04T10:19:17.439000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-78","created":"2024-10-30T09:28:16.284000","resolved":"2024-10-30T11:35:38.155000","priority":"Низкий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-79","created":"2024-10-30T09:28:41.649000","resolved":"2024-10-30T11:25:58.103000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-80","created":"2024-10-31T15:30:37.715000","resolved":"2024-11-02T11:37:11.310000","priority":"Низкий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-81","created":"2024-10-31T15:38:18.091000","resolved":"2024-10-31T18:14:00.191000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-82","created":"2024-10-31T15:39:18.882000","resolved":"2024-11-15T11:47:54.871000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-83","created":"2024-10-31T15:51:41.330000","resolved":"2024-11-08T11:09:33.891000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-84","created":"2024-11-01T12:13:16.800000","resolved":"2024-11-02T14:22:39.109000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-85","created":"2024-11-07T16:05:12.809000","resolved":"2024-11-08T17:42:37.090000","priority":"Критический","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-86","created":"2024-11-08T13:29:09.784000","resolved":"2024-11-08T17:43:00.935000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-87","created":"2024-11-08T17:41:43.169000","resolved":"2024-11-11T11:14:53.795000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-88","created":"2024-11-15T11:47:47.885000","resolved":"2024-11-15T13:25:54.497000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-89","created":"2024-11-15T11:59:49.527000","resolved":"2024-11-15T16:01:26.799000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-90","created":"2024-11-15T14:20:09.336000","resolved":"2024-11-15T16:01:10.840000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-91","created":"2024-11-22T13:42:54.838000","resolved":"2024-11-25T16:37:17.415000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-92","created":"2024-11-22T13:44:02.069000","resolved":"2024-11-25T16:37:18.701000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-93","created":"2024-11-25T16:37:44.668000","resolved":"2025-02-04T10:18:52.628000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-94","created":"2025-04-03T09:56:47.005000","resolved":"2025-04-03T10:11:27.232000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-95","created":"2025-04-04T10:25:45.074000","resolved":"2025-04-11T16:17:08.912000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-96","created":"2025-04-04T10:41:37.612000","resolved":"2025-04-04T18:05:20.692000","priority":"Средний","state":"DONE","type":"Обращение","tags":"BE","escalated":false},{"id":"MCA-97","created":"2025-04-04T16:14:54.376000","resolved":"2025-04-04T16:19:58.300000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-98","created":"2025-04-07T13:17:15.271000","resolved":"2025-04-07T13:34:45.441000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-99","created":"2025-04-07T17:02:46.519000","resolved":"2025-04-08T13:27:25.473000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-101","created":"2025-04-08T10:28:34.597000","resolved":"2025-04-08T16:11:35.093000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-102","created":"2025-04-08T16:12:13.822000","resolved":"2025-04-11T16:17:57.680000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-103","created":"2025-04-09T09:09:21.652000","resolved":"2025-04-17T13:48:27.622000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-104","created":"2025-04-09T14:18:13.912000","resolved":"2025-04-10T15:52:58.538000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-105","created":"2025-04-09T14:19:50.517000","resolved":"2025-04-09T14:28:25.706000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-106","created":"2025-04-09T16:35:24.883000","resolved":"2025-04-15T16:15:00.193000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-107","created":"2025-04-10T11:50:17.227000","resolved":"2025-04-10T11:53:49.887000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-108","created":"2025-04-10T14:52:02.877000","resolved":"2025-04-11T16:15:59.304000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-109","created":"2025-04-10T15:16:05.363000","resolved":"2025-04-11T15:59:26.411000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-110","created":"2025-04-11T09:06:46.940000","resolved":"2025-04-14T17:02:05.200000","priority":"Средний","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-111","created":"2025-04-14T09:06:46.545000","resolved":"2025-04-28T11:02:47.622000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-112","created":"2025-04-15T09:08:39.717000","resolved":"2025-04-15T09:35:23.407000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-113","created":"2025-04-16T11:17:50.763000","resolved":"2025-04-16T11:21:13.950000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-115","created":"2025-04-17T11:13:29.296000","resolved":"2025-04-17T12:12:46.006000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-116","created":"2025-04-17T12:11:27.848000","resolved":"2025-04-17T17:04:45.672000","priority":"Высокий","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-117","created":"2025-04-17T14:06:38.784000","resolved":"2025-06-06T16:07:51.375000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-118","created":"2025-04-17T14:16:32.178000","resolved":"2025-04-17T15:28:07.451000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-119","created":"2025-04-18T13:59:02.350000","resolved":"2025-04-28T10:58:54.064000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-120","created":"2025-04-21T17:09:47.519000","resolved":"2025-04-21T17:10:27.377000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-121","created":"2025-04-21T17:11:31.391000","resolved":"2025-04-21T17:11:46.605000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-122","created":"2025-04-22T11:28:19.419000","resolved":"2025-04-22T11:44:54.841000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-123","created":"2025-04-22T13:34:41.518000","resolved":"2025-04-28T11:01:09.469000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-124","created":"2025-04-22T13:56:28.231000","resolved":"2025-04-22T13:57:10.938000","priority":"Средний","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-125","created":"2025-04-22T15:40:37.888000","resolved":"2025-06-24T14:35:16.017000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-126","created":"2025-04-23T09:04:33.488000","resolved":"2025-04-24T12:07:54.134000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-127","created":"2025-04-23T09:38:10.930000","resolved":"2025-04-24T12:09:27.041000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-128","created":"2025-04-23T10:42:46.951000","resolved":"2025-04-23T16:08:43.677000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-129","created":"2025-04-23T10:44:56.260000","resolved":"2025-04-23T10:45:09.706000","priority":"Низкий","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-130","created":"2025-04-23T10:46:48.120000","resolved":"2025-04-23T10:47:12.334000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-131","created":"2025-04-23T10:48:33.384000","resolved":"2025-04-28T11:03:15.560000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-132","created":"2025-04-23T11:19:39.033000","resolved":"2025-04-24T11:57:58.505000","priority":"Низкий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-133","created":"2025-04-23T11:25:53.660000","resolved":"2025-04-24T17:28:44.688000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-134","created":"2025-04-23T11:28:08.548000","resolved":"2025-04-23T15:17:00.169000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-135","created":"2025-04-23T11:30:35.835000","resolved":"2025-04-24T12:00:23.342000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-136","created":"2025-04-23T11:32:14.985000","resolved":"2025-04-24T11:59:51.488000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-137","created":"2025-04-23T11:33:34.744000","resolved":"2025-06-06T16:08:13.489000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-138","created":"2025-04-23T12:31:23.932000","resolved":"2025-04-28T11:00:52.887000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-139","created":"2025-04-23T12:32:55.049000","resolved":"2025-04-28T11:02:09.293000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-140","created":"2025-04-23T13:14:22.777000","resolved":"2025-04-24T12:03:23.565000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-141","created":"2025-04-23T15:15:54.380000","resolved":"2025-04-28T10:59:52.769000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-142","created":"2025-04-23T17:38:01.955000","resolved":"2025-04-24T12:02:45.573000","priority":"Низкий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-143","created":"2025-04-23T18:22:11.255000","resolved":"2025-04-24T11:58:39.024000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-144","created":"2025-04-24T09:08:40.411000","resolved":"2025-04-24T11:59:12.029000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-145","created":"2025-04-24T12:17:53.978000","resolved":"2025-04-30T09:43:28.770000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-146","created":"2025-04-24T12:20:08.319000","resolved":"2025-04-24T13:06:34.837000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-147","created":"2025-04-24T13:02:42.362000","resolved":"2025-04-24T15:44:35.562000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-148","created":"2025-04-24T13:48:55.307000","resolved":"2025-04-28T11:00:36.844000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-149","created":"2025-04-24T13:52:31.312000","resolved":"2025-04-24T13:55:47.265000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-150","created":"2025-04-24T14:53:37.748000","resolved":"2025-04-24T14:53:45.400000","priority":"Средний","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-151","created":"2025-04-25T10:13:32.511000","resolved":"2025-04-28T11:01:39.927000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-152","created":"2025-04-25T14:14:21.643000","resolved":"2025-04-28T11:00:13.327000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-153","created":"2025-04-28T10:03:51.888000","resolved":"2025-04-29T16:08:38.691000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-154","created":"2025-04-28T10:21:31.367000","resolved":"2025-04-28T10:59:30.955000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-155","created":"2025-04-28T10:56:42.463000","resolved":"2025-04-30T09:43:42.274000","priority":"Низкий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-156","created":"2025-04-28T11:43:02.110000","resolved":"2025-04-29T16:06:47.603000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-157","created":"2025-04-28T12:31:49.763000","resolved":"2025-04-29T11:56:06.354000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-158","created":"2025-04-29T10:17:54.069000","resolved":"2025-04-29T16:07:07.958000","priority":"Высокий","state":"REJECTED","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-159","created":"2025-04-29T11:18:38.628000","resolved":"2025-05-07T13:54:38.655000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-160","created":"2025-04-29T12:49:49.423000","resolved":"2025-04-29T16:07:45.886000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-161","created":"2025-04-29T13:00:10.643000","resolved":"2025-04-29T13:03:03.001000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-162","created":"2025-04-30T09:38:54.336000","resolved":"2025-06-06T16:10:37.914000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-163","created":"2025-04-30T10:12:46.672000","resolved":"2025-06-27T17:14:13.407000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-164","created":"2025-04-30T13:10:02.419000","resolved":"2025-05-07T13:58:06.671000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-165","created":"2025-04-30T13:14:10.217000","resolved":"2025-04-30T17:16:57.982000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-166","created":"2025-04-30T14:56:17.987000","resolved":"2025-06-24T14:18:33.593000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-167","created":"2025-05-05T11:20:03.115000","resolved":"2025-05-07T13:57:17.081000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-168","created":"2025-05-05T15:00:24.553000","resolved":"2025-05-07T13:59:25.133000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-169","created":"2025-05-05T15:01:50.214000","resolved":"2025-05-07T13:59:42.125000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-170","created":"2025-05-06T10:15:13.349000","resolved":"2025-05-06T10:37:57.181000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-171","created":"2025-05-06T12:22:48.663000","resolved":"2025-05-13T21:30:06.680000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-172","created":"2025-05-06T14:40:23.977000","resolved":"2025-05-07T13:55:36.456000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-173","created":"2025-05-07T11:19:30.429000","resolved":"2025-05-07T14:41:37.235000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-174","created":"2025-05-07T16:04:55.489000","resolved":"2025-05-12T13:19:13.646000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-175","created":"2025-05-12T11:59:00.860000","resolved":"2025-05-15T16:21:24.974000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-176","created":"2025-05-12T12:01:49.792000","resolved":"2025-05-13T12:32:42.698000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-177","created":"2025-05-13T10:39:10.750000","resolved":"2025-05-13T12:34:27.405000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-178","created":"2025-05-13T12:27:37.926000","resolved":"2025-05-15T16:35:26.876000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-179","created":"2025-05-13T14:49:21.722000","resolved":"2025-05-13T14:49:49.054000","priority":"Высокий","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-180","created":"2025-05-13T14:50:48.266000","resolved":"2025-05-13T14:51:08.706000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-181","created":"2025-05-13T14:51:59.176000","resolved":"2025-05-13T14:52:42.567000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-182","created":"2025-05-13T14:53:58.159000","resolved":"2025-05-13T14:54:07.103000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-183","created":"2025-05-13T14:55:34.274000","resolved":"2025-05-13T16:33:58.117000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-184","created":"2025-05-13T15:10:48.781000","resolved":"2025-06-06T16:11:52.309000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-185","created":"2025-05-13T16:30:57.147000","resolved":"2025-08-08T16:35:40.188000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-186","created":"2025-05-14T11:52:44.033000","resolved":"2025-05-15T16:33:44.425000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-187","created":"2025-05-14T15:37:13.056000","resolved":"2025-06-06T16:09:56.225000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-188","created":"2025-05-15T14:18:42.002000","resolved":"2025-05-15T15:12:32.061000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-189","created":"2025-05-15T14:31:06.488000","resolved":"2025-05-15T16:44:22.832000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-190","created":"2025-05-15T15:27:20.577000","resolved":"2025-05-15T15:27:26.491000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-191","created":"2025-05-19T10:37:23.460000","resolved":"2025-06-24T13:36:50.781000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-192","created":"2025-05-19T10:39:28.593000","resolved":"2025-07-11T15:09:43.584000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-193","created":"2025-05-19T15:58:23.076000","resolved":"2025-08-19T14:10:51.599000","priority":"Высокий","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-194","created":"2025-05-19T15:59:34.898000","resolved":"2025-06-06T16:10:12.563000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-195","created":"2025-05-20T15:47:41.537000","resolved":"2025-05-23T13:16:35.222000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-196","created":"2025-05-22T11:39:49.404000","resolved":"2025-06-06T16:06:11.566000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"","escalated":false},{"id":"MCA-197","created":"2025-05-23T10:37:47.368000","resolved":"2025-07-21T13:55:37.565000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-198","created":"2025-05-23T12:11:39.228000","resolved":"2025-06-06T16:12:56.514000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-199","created":"2025-05-26T11:49:20.134000","resolved":"2025-05-26T14:00:05.614000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-200","created":"2025-05-26T14:51:06.470000","resolved":"2025-05-30T12:27:00.944000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-201","created":"2025-05-26T18:17:18.935000","resolved":"2025-06-06T16:06:41.746000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-202","created":"2025-05-26T18:18:07.870000","resolved":"2025-06-26T12:39:12.413000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-203","created":"2025-05-26T18:19:23.698000","resolved":"2025-05-30T12:33:51.627000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-204","created":"2025-05-26T18:20:31.133000","resolved":"2025-05-30T12:40:07.394000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-205","created":"2025-05-27T13:10:08.672000","resolved":"2025-05-30T15:43:19.537000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-206","created":"2025-05-27T17:41:55.828000","resolved":"2025-05-30T15:20:03.237000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-207","created":"2025-05-28T09:10:12.437000","resolved":"2025-06-16T18:33:11.911000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-208","created":"2025-05-29T09:31:34.663000","resolved":"2025-05-29T09:32:13.549000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-209","created":"2025-05-29T09:33:25.467000","resolved":"2025-06-02T18:03:24.411000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-210","created":"2025-05-29T13:02:04.026000","resolved":"2025-05-29T13:02:54.390000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-211","created":"2025-05-29T13:04:43.694000","resolved":"2025-06-06T16:07:05.352000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-212","created":"2025-05-30T09:32:53.002000","resolved":"2025-05-30T15:35:27.012000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-213","created":"2025-05-30T11:13:44.705000","resolved":"2025-05-30T19:02:16.263000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-214","created":"2025-05-30T15:50:31.535000","resolved":"2025-06-05T12:36:06.806000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-215","created":"2025-05-30T16:20:39.439000","resolved":"2025-05-30T17:43:19.511000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-216","created":"2025-06-02T09:24:58.591000","resolved":"2025-06-02T14:37:12.696000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-217","created":"2025-06-02T13:58:46.548000","resolved":"2025-06-05T12:35:32.185000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-218","created":"2025-06-02T14:36:41.614000","resolved":"2025-06-02T14:39:02.240000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-220","created":"2025-06-03T09:09:44.640000","resolved":"2025-06-05T12:35:00.468000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-221","created":"2025-06-03T11:24:40.341000","resolved":"2025-06-03T11:24:50.138000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-222","created":"2025-06-03T11:25:47.859000","resolved":"2025-06-03T15:18:11.812000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-223","created":"2025-06-03T11:27:03.344000","resolved":"2025-06-05T12:32:05.624000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-224","created":"2025-06-03T15:10:36.178000","resolved":"2025-06-03T15:11:07.574000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-225","created":"2025-06-03T15:58:49.696000","resolved":"2025-06-05T12:34:48.093000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-226","created":"2025-06-03T16:29:30.155000","resolved":"2025-06-05T12:37:06.301000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-227","created":"2025-06-03T17:34:55.421000","resolved":"2025-06-05T12:34:33.121000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-228","created":"2025-06-04T09:54:53.599000","resolved":"2025-06-04T09:55:20.116000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-229","created":"2025-06-04T10:40:49.920000","resolved":"2025-06-05T12:37:38.021000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-230","created":"2025-06-04T11:55:48.602000","resolved":"2025-06-24T17:36:57.278000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-231","created":"2025-06-04T15:46:23.436000","resolved":"2025-06-24T15:08:20.600000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-232","created":"2025-06-05T09:11:46.362000","resolved":"2025-06-05T12:33:10.317000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-233","created":"2025-06-05T09:39:17.427000","resolved":"2025-06-05T12:32:41.392000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-234","created":"2025-06-05T11:24:30.439000","resolved":"2025-06-05T11:24:45.851000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-235","created":"2025-06-05T12:31:35.029000","resolved":"2025-06-05T12:40:56.129000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-236","created":"2025-06-05T12:40:31.908000","resolved":"2025-07-01T09:37:28.438000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-237","created":"2025-06-06T08:52:38.014000","resolved":"2025-06-06T08:53:23.050000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-238","created":"2025-06-06T08:54:10.251000","resolved":"2025-06-06T15:56:30.634000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-239","created":"2025-06-09T09:21:10.311000","resolved":"2025-06-11T15:59:39.657000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-240","created":"2025-06-09T09:26:24.392000","resolved":"2025-06-11T16:21:00.336000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-241","created":"2025-06-09T14:24:26.997000","resolved":"2025-06-11T16:24:22.225000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-242","created":"2025-06-09T15:16:00.410000","resolved":"2025-06-24T15:06:19.861000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-243","created":"2025-06-09T17:04:13.892000","resolved":"2025-06-24T14:55:21.580000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-244","created":"2025-06-10T11:59:20.269000","resolved":"2025-06-11T16:29:11.907000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-245","created":"2025-06-10T13:14:54.664000","resolved":"2025-06-10T14:01:12.309000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-246","created":"2025-06-10T14:41:43.689000","resolved":"2025-06-10T14:42:07.543000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-247","created":"2025-06-11T09:15:20.727000","resolved":"2025-07-04T09:51:47.613000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-248","created":"2025-06-11T13:20:55.932000","resolved":"2025-06-11T13:21:04.479000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-249","created":"2025-06-11T13:22:06.699000","resolved":"2025-06-11T13:22:54.699000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-250","created":"2025-06-11T13:24:44.287000","resolved":"2025-06-11T13:24:58.182000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-251","created":"2025-06-11T15:03:44.070000","resolved":"2025-06-11T16:35:23.105000","priority":"Высокий","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-252","created":"2025-06-16T13:04:39.688000","resolved":"2025-06-24T14:55:03.549000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-253","created":"2025-06-16T13:51:36.950000","resolved":"2025-06-24T13:49:31.966000","priority":"Высокий","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-254","created":"2025-06-17T11:28:54.993000","resolved":"2025-06-24T12:32:17.918000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-255","created":"2025-06-17T11:29:56.074000","resolved":"2025-06-24T13:35:05.242000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-256","created":"2025-06-17T11:31:43.005000","resolved":"2025-07-21T13:20:10.703000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-257","created":"2025-06-17T11:54:11.090000","resolved":"2025-06-24T13:35:54.102000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-258","created":"2025-06-17T15:15:27.498000","resolved":"2025-06-24T13:50:19.501000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-259","created":"2025-06-18T12:58:09.378000","resolved":"2025-06-24T12:45:29.282000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-260","created":"2025-06-18T14:33:32.853000","resolved":"2025-06-25T11:33:23.843000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-261","created":"2025-06-19T11:05:10.349000","resolved":"2025-09-26T18:05:20.755000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-262","created":"2025-06-19T13:01:13.284000","resolved":"2025-06-24T13:51:36.365000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-263","created":"2025-06-19T13:02:43.881000","resolved":"2025-06-26T11:07:46.678000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-264","created":"2025-06-20T10:21:11.888000","resolved":"2025-06-20T10:21:45.064000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-265","created":"2025-06-20T12:04:06.840000","resolved":"2025-06-26T11:11:47.910000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-266","created":"2025-06-20T12:05:54.075000","resolved":"2025-09-11T13:35:26.383000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-267","created":"2025-06-23T12:34:28.947000","resolved":"2025-06-26T11:09:27.238000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-268","created":"2025-06-24T12:06:16.254000","resolved":"2025-06-27T09:49:56.051000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-270","created":"2025-06-24T12:30:37.009000","resolved":"2025-06-24T12:46:20.118000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-271","created":"2025-06-25T09:44:31.331000","resolved":"2025-06-25T10:13:19.620000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-272","created":"2025-06-25T09:55:56.103000","resolved":"2025-06-26T11:06:57.490000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-273","created":"2025-06-25T11:45:11.797000","resolved":"2025-06-25T18:52:13.376000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-274","created":"2025-06-25T18:58:12.755000","resolved":"2025-08-08T11:42:15.902000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-275","created":"2025-06-26T09:37:20.333000","resolved":"2025-08-08T11:03:08.029000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-276","created":"2025-06-26T11:04:40.116000","resolved":"2026-01-14T11:06:09.357000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-277","created":"2025-06-27T11:38:57.907000","resolved":"2025-07-30T14:41:49.611000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-278","created":"2025-06-30T09:33:39.233000","resolved":"2025-08-06T12:12:12.022000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-279","created":"2025-06-30T10:15:33.533000","resolved":"2025-07-15T16:36:59.443000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-280","created":"2025-06-30T11:11:17.796000","resolved":"2025-06-30T15:45:03.715000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-281","created":"2025-06-30T15:35:13.069000","resolved":"2025-07-02T15:16:29.005000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-282","created":"2025-06-30T17:26:57.856000","resolved":"2025-08-08T11:44:13.347000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-283","created":"2025-07-01T12:36:31.965000","resolved":"2025-07-03T09:57:41.843000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-284","created":"2025-07-01T14:47:07.514000","resolved":"2025-09-12T16:10:04.573000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-285","created":"2025-07-01T17:06:36.572000","resolved":"2025-08-08T13:56:43.574000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-286","created":"2025-07-01T17:08:17.666000","resolved":"2025-07-30T15:47:37.996000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-287","created":"2025-07-01T17:49:06.226000","resolved":"2025-07-02T09:12:46.491000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-288","created":"2025-07-01T17:51:34.691000","resolved":"2025-08-13T17:18:31.204000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-289","created":"2025-07-02T09:09:43.748000","resolved":"2025-07-03T09:12:37.287000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-290","created":"2025-07-02T14:37:33.684000","resolved":"2025-07-03T09:13:42.871000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-291","created":"2025-07-02T14:39:20.637000","resolved":"2025-07-04T10:38:12.810000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-292","created":"2025-07-02T14:48:57.368000","resolved":"2025-09-26T14:19:11.142000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-293","created":"2025-07-03T09:10:30.825000","resolved":"2025-08-08T10:59:28.250000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-294","created":"2025-07-03T15:23:57.015000","resolved":"2025-12-24T14:23:53.239000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-295","created":"2025-07-03T16:03:51.875000","resolved":"2025-07-04T15:47:10.512000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-296","created":"2025-07-04T10:59:57.156000","resolved":"2025-07-15T16:36:14.654000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-297","created":"2025-07-04T14:51:58.283000","resolved":"2025-07-04T15:07:53.082000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-298","created":"2025-07-07T11:03:19.128000","resolved":"2025-09-12T10:05:50.719000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-299","created":"2025-07-08T13:47:48.395000","resolved":"2025-07-08T17:55:20.243000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-300","created":"2025-07-08T14:49:23.495000","resolved":"2025-07-21T15:09:36.067000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-301","created":"2025-07-08T16:35:58.563000","resolved":"2026-01-13T14:53:14.128000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-302","created":"2025-07-09T15:31:27.029000","resolved":"2025-07-10T09:58:41.213000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-303","created":"2025-07-10T13:15:36.199000","resolved":"2025-07-15T16:38:00.402000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-305","created":"2025-07-11T16:25:00.426000","resolved":"2025-07-11T16:25:53.501000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-306","created":"2025-07-11T16:27:02.737000","resolved":"2025-07-21T15:00:59.177000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-310","created":"2025-07-14T12:22:04.953000","resolved":"2025-07-14T12:36:17.043000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-311","created":"2025-07-14T12:41:54.657000","resolved":"2025-07-14T13:58:47.182000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-312","created":"2025-07-14T15:22:08.288000","resolved":"2025-07-14T16:05:45.735000","priority":"Средний","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-316","created":"2025-07-16T11:16:41.039000","resolved":"2025-07-21T18:22:28.959000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-319","created":"2025-07-17T12:34:05.646000","resolved":"2025-08-29T16:07:38.400000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-320","created":"2025-07-17T12:43:06.473000","resolved":"2025-07-18T10:16:12.048000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-321","created":"2025-07-17T12:51:07.326000","resolved":"2025-09-18T16:41:47.047000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-322","created":"2025-07-17T16:03:38.424000","resolved":"2025-07-17T16:04:36.977000","priority":"Критический","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-323","created":"2025-07-18T09:43:01.871000","resolved":"2025-07-18T10:15:30.014000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-324","created":"2025-07-18T12:54:16.796000","resolved":"2025-07-18T15:41:03.598000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-325","created":"2025-07-18T13:43:43.321000","resolved":"2025-07-21T17:06:55.755000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-326","created":"2025-07-18T15:24:18.143000","resolved":"2025-07-18T16:55:00.705000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-328","created":"2025-07-18T16:01:32.953000","resolved":"2025-07-18T16:42:05.738000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-329","created":"2025-07-18T16:43:44.371000","resolved":"2025-07-21T09:14:14.968000","priority":"Высокий","state":"CONVERTED TO TASK","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-330","created":"2025-07-18T17:16:15.232000","resolved":"2025-07-21T13:54:24.972000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-332","created":"2025-07-21T09:19:29.377000","resolved":"2025-10-22T16:50:56.463000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-333","created":"2025-07-21T10:32:46.423000","resolved":"2025-08-08T11:19:43.141000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-334","created":"2025-07-21T10:52:39.143000","resolved":"2025-07-21T12:00:05.774000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-335","created":"2025-07-21T16:33:09.989000","resolved":"2025-08-08T11:05:16.663000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-336","created":"2025-07-22T11:56:03.098000","resolved":"2025-07-22T17:39:43.173000","priority":"Средний","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-337","created":"2025-07-22T17:15:25.871000","resolved":"2025-07-22T17:23:33.477000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-338","created":"2025-07-22T17:44:12.172000","resolved":"2025-07-23T09:53:25.633000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-339","created":"2025-07-23T10:00:16.484000","resolved":"2025-07-24T11:32:56.283000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-340","created":"2025-07-23T11:08:05.396000","resolved":"2025-07-25T12:23:42.742000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-341","created":"2025-07-23T12:47:03.883000","resolved":"2025-09-30T12:06:26.758000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-342","created":"2025-07-23T16:31:45.558000","resolved":"2025-10-31T15:06:07.190000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-343","created":"2025-07-23T18:03:10.847000","resolved":"2025-09-18T16:51:29.064000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-344","created":"2025-07-24T11:29:24.583000","resolved":"2025-07-25T12:26:22.289000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-345","created":"2025-07-24T11:31:36.693000","resolved":"2025-07-28T14:34:55.879000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-346","created":"2025-07-28T14:00:05.210000","resolved":"2025-07-30T14:43:31.362000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-347","created":"2025-07-29T09:01:34.034000","resolved":"2025-09-11T16:58:32.916000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-348","created":"2025-07-29T09:03:26.477000","resolved":"2025-08-28T09:18:45.122000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-350","created":"2025-07-31T09:10:33.987000","resolved":"2025-10-22T16:51:06.329000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-351","created":"2025-07-31T12:19:14.651000","resolved":"2025-07-31T13:23:38.680000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-352","created":"2025-07-31T15:44:58.639000","resolved":"2025-08-01T16:36:50.959000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-353","created":"2025-08-01T10:13:43.050000","resolved":"2025-08-01T10:14:44.264000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-354","created":"2025-08-01T16:44:58.290000","resolved":"2025-08-01T16:55:47.455000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-355","created":"2025-08-05T11:03:24.932000","resolved":"2025-08-05T11:13:43.352000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-356","created":"2025-08-06T12:14:30.365000","resolved":"2025-08-07T09:52:06.170000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-357","created":"2025-08-06T13:51:03.815000","resolved":"2025-08-07T09:20:12.819000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-358","created":"2025-08-06T15:51:53.314000","resolved":"2025-08-07T10:18:33.677000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-359","created":"2025-08-06T18:00:33.745000","resolved":"2025-08-15T11:36:32.435000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-360","created":"2025-08-06T18:01:20.035000","resolved":"2025-08-15T16:28:02.963000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-361","created":"2025-08-07T12:03:52.419000","resolved":"2025-08-08T13:49:38.736000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-362","created":"2025-08-07T12:59:19.412000","resolved":null,"priority":"Средний","state":"PAUSED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-363","created":"2025-08-07T13:44:32.015000","resolved":"2025-08-15T16:24:39.877000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-364","created":"2025-08-07T14:55:10.646000","resolved":"2025-09-26T15:06:34.448000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-365","created":"2025-08-08T09:10:28.634000","resolved":"2025-08-08T13:53:59.944000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-366","created":"2025-08-08T10:19:39.871000","resolved":"2025-08-08T10:19:48.922000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-367","created":"2025-08-08T10:20:31.911000","resolved":"2025-08-18T10:59:23.137000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-368","created":"2025-08-08T10:40:48.441000","resolved":"2025-08-18T10:59:28.414000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-369","created":"2025-08-08T12:08:18.807000","resolved":"2025-08-08T16:26:57.902000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-370","created":"2025-08-08T12:09:09.853000","resolved":"2025-08-08T12:18:11.027000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-371","created":"2025-08-08T12:17:40.551000","resolved":"2025-08-25T10:31:18.525000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-373","created":"2025-08-08T13:51:43.833000","resolved":"2025-08-15T11:36:06.664000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-374","created":"2025-08-08T16:05:50.624000","resolved":"2025-08-08T16:28:04.948000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-375","created":"2025-08-08T16:43:26.055000","resolved":"2025-09-26T18:05:40.138000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-378","created":"2025-08-11T16:04:17.372000","resolved":"2025-09-26T13:47:49.972000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-379","created":"2025-08-12T08:43:24.347000","resolved":"2025-09-02T22:36:09.137000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-380","created":"2025-08-12T08:55:18.620000","resolved":"2025-08-12T17:30:17.590000","priority":"Критический","state":"REJECTED","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-381","created":"2025-08-12T11:26:51.373000","resolved":"2025-08-25T10:53:31.316000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-382","created":"2025-08-12T11:27:36.624000","resolved":"2025-08-12T12:16:28.786000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-383","created":"2025-08-12T13:35:45.332000","resolved":"2025-09-26T15:07:04.711000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-384","created":"2025-08-13T11:02:57.960000","resolved":"2025-08-13T12:07:30.186000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-385","created":"2025-08-13T12:29:49.906000","resolved":"2025-08-13T14:07:49.727000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-386","created":"2025-08-13T12:30:23.420000","resolved":"2025-08-13T14:07:51.740000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-387","created":"2025-08-13T13:23:42.698000","resolved":"2025-08-13T14:07:54.123000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-388","created":"2025-08-13T15:48:47.865000","resolved":"2025-08-13T16:07:06.168000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-389","created":"2025-08-13T16:21:55.361000","resolved":"2025-09-05T09:27:42.908000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-390","created":"2025-08-14T10:49:54.913000","resolved":"2025-08-14T11:00:52.949000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-391","created":"2025-08-14T10:54:41.644000","resolved":"2026-01-13T14:47:08.184000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-392","created":"2025-08-14T13:38:05.745000","resolved":"2025-08-15T11:32:25.752000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-393","created":"2025-08-14T15:20:01.369000","resolved":"2025-08-15T11:32:40.221000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-394","created":"2025-08-14T15:57:13.012000","resolved":"2025-09-30T11:05:16.559000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-395","created":"2025-08-15T11:33:42.380000","resolved":"2025-08-15T11:33:52.393000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-396","created":"2025-08-15T11:38:53.598000","resolved":"2025-08-15T11:38:58.420000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-397","created":"2025-08-18T12:54:03.067000","resolved":"2025-08-18T16:07:22.767000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-398","created":"2025-08-18T19:10:23.679000","resolved":"2025-08-19T08:51:59.783000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-399","created":"2025-08-19T08:53:06.196000","resolved":"2025-08-19T13:45:14.077000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-400","created":"2025-08-19T11:03:28.262000","resolved":"2025-08-19T11:05:19.003000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-401","created":"2025-08-19T11:26:01.302000","resolved":"2025-08-19T11:27:08.185000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-402","created":"2025-08-19T12:11:43.877000","resolved":"2025-08-19T12:42:15.021000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-403","created":"2025-08-19T12:53:24.833000","resolved":"2025-08-19T13:20:56.066000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-404","created":"2025-08-20T12:30:38.860000","resolved":"2025-08-20T12:54:14.547000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-405","created":"2025-08-21T10:40:50.611000","resolved":"2025-08-21T11:12:24.394000","priority":"Средний","state":"REJECTED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-406","created":"2025-08-21T10:45:04.257000","resolved":"2025-08-21T12:32:46.601000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-407","created":"2025-08-21T11:01:15.487000","resolved":"2025-08-21T12:32:40.622000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-408","created":"2025-08-21T12:25:34.764000","resolved":"2025-08-21T12:55:55.142000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-409","created":"2025-08-22T09:48:10.990000","resolved":"2025-08-22T10:27:58.715000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-410","created":"2025-08-25T15:07:17.204000","resolved":"2026-01-22T16:34:54.153000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-411","created":"2025-08-26T10:27:32.897000","resolved":"2025-08-26T14:18:50.955000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-412","created":"2025-08-26T12:26:28.230000","resolved":"2025-08-26T13:53:41.266000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-413","created":"2025-08-26T14:11:55.935000","resolved":"2025-09-26T18:05:05.863000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-414","created":"2025-08-26T17:15:41.658000","resolved":"2025-08-27T12:40:34.435000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-415","created":"2025-08-27T09:39:40.959000","resolved":"2025-08-29T16:08:06.997000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-416","created":"2025-08-27T09:52:15.046000","resolved":"2026-01-22T16:33:26.904000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-417","created":"2025-08-27T12:36:52.492000","resolved":"2025-08-29T11:15:28.250000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-418","created":"2025-08-27T17:31:34.815000","resolved":"2025-08-28T18:16:50.012000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-419","created":"2025-08-27T17:44:51.594000","resolved":"2025-08-29T11:16:31.475000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-420","created":"2025-08-28T09:15:51.718000","resolved":"2025-09-11T11:16:59.135000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-421","created":"2025-08-28T18:16:16.649000","resolved":"2025-10-28T17:48:37.617000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-422","created":"2025-08-28T19:09:09.471000","resolved":"2025-09-30T10:44:39.436000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-423","created":"2025-09-01T09:28:41.054000","resolved":"2025-09-01T09:47:25.845000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-424","created":"2025-09-01T10:18:11.108000","resolved":"2025-09-26T15:07:52.026000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-425","created":"2025-09-01T10:20:05.186000","resolved":"2025-09-01T14:12:33.946000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-426","created":"2025-09-01T10:38:50.346000","resolved":"2025-12-24T18:28:08.036000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-427","created":"2025-09-02T10:48:02.453000","resolved":"2025-10-06T15:09:47.828000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-428","created":"2025-09-02T14:19:37.349000","resolved":"2025-09-03T10:43:40.467000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-429","created":"2025-09-02T17:39:49.057000","resolved":"2025-09-03T10:44:03.694000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-430","created":"2025-09-03T15:13:36.617000","resolved":"2025-12-24T14:32:07.157000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-431","created":"2025-09-04T09:25:44.805000","resolved":"2025-09-04T10:31:02.445000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-432","created":"2025-09-04T22:05:25.680000","resolved":"2025-09-04T22:05:35.208000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-433","created":"2025-09-08T15:09:41.717000","resolved":"2025-09-08T15:43:51.873000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-434","created":"2025-09-09T13:51:57.918000","resolved":"2025-09-11T09:29:00.580000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-435","created":"2025-09-10T09:09:56.496000","resolved":"2026-01-22T15:21:12.088000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-436","created":"2025-09-10T09:16:19.402000","resolved":"2025-09-10T10:33:08.541000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-437","created":"2025-09-10T09:50:29.343000","resolved":"2025-09-11T09:31:16.588000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-438","created":"2025-09-10T13:05:31.372000","resolved":"2025-09-11T12:50:02.036000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-439","created":"2025-09-10T18:41:26.284000","resolved":"2025-09-12T13:59:15.024000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-440","created":"2025-09-11T12:03:37.088000","resolved":"2025-09-12T13:21:46.155000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-441","created":"2025-09-11T12:06:41.887000","resolved":"2025-09-11T17:00:39.103000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-442","created":"2025-09-11T12:28:55.421000","resolved":"2025-10-06T15:05:01.445000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-443","created":"2025-09-11T13:51:26.906000","resolved":"2025-09-12T13:59:06.923000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-444","created":"2025-09-11T17:07:22","resolved":"2025-09-11T17:26:58.883000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-445","created":"2025-09-12T12:01:08.434000","resolved":"2025-09-12T14:05:50.011000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-446","created":"2025-09-12T13:11:34.554000","resolved":"2025-09-12T16:09:23.015000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-447","created":"2025-09-12T17:00:51.373000","resolved":"2025-09-17T13:41:40.335000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-448","created":"2025-09-15T09:18:06.716000","resolved":"2025-12-14T20:46:04.042000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-449","created":"2025-09-15T13:19:59.871000","resolved":"2025-09-15T19:24:37.681000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-450","created":"2025-09-15T13:21:20.775000","resolved":"2025-09-19T00:59:46.871000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-451","created":"2025-09-15T14:26:48.733000","resolved":"2026-01-19T12:29:45.730000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-452","created":"2025-09-16T11:10:29.187000","resolved":"2025-09-16T17:27:16.169000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-453","created":"2025-09-16T11:11:34.034000","resolved":"2025-09-16T13:38:56.270000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-454","created":"2025-09-16T17:21:09.238000","resolved":"2025-09-16T17:22:29.497000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-455","created":"2025-09-16T17:26:06.453000","resolved":"2025-09-16T17:26:31.971000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-457","created":"2025-09-16T18:22:42.899000","resolved":"2025-10-21T15:37:36.493000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-458","created":"2025-09-22T10:10:48.126000","resolved":"2025-09-22T17:08:15.871000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-459","created":"2025-09-22T16:33:25.197000","resolved":"2025-10-06T14:54:04.258000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-460","created":"2025-09-22T17:10:03.606000","resolved":"2025-09-22T17:10:15.550000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-461","created":"2025-09-24T15:27:03.067000","resolved":"2025-09-24T16:07:37.693000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-462","created":"2025-09-26T12:44:10.523000","resolved":"2025-09-26T12:54:13.157000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-463","created":"2025-09-26T12:45:59.782000","resolved":"2025-10-08T16:34:22.005000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-464","created":"2025-09-29T11:41:58.484000","resolved":"2025-09-29T12:55:00.263000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-465","created":"2025-09-29T11:44:19.463000","resolved":"2025-10-13T11:15:16.962000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-466","created":"2025-09-29T12:02:03.152000","resolved":"2025-09-29T12:08:10.928000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-467","created":"2025-09-29T12:28:49.363000","resolved":"2025-09-29T14:13:36.614000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-468","created":"2025-09-29T12:59:23.707000","resolved":"2025-09-30T10:09:53.346000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-469","created":"2025-09-29T17:13:52.247000","resolved":"2025-10-01T10:25:57.718000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-470","created":"2025-09-29T18:34:03.963000","resolved":"2025-10-21T14:49:00.982000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-472","created":"2025-09-30T09:37:43.822000","resolved":"2025-12-24T14:32:49.255000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-473","created":"2025-09-30T10:04:39.164000","resolved":"2025-09-30T10:05:07.767000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-474","created":"2025-09-30T10:57:12.705000","resolved":"2025-09-30T10:57:53.484000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-475","created":"2025-09-30T11:26:57.804000","resolved":"2025-10-06T15:04:28.084000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-476","created":"2025-09-30T13:43:08.564000","resolved":"2025-12-24T15:38:15.101000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-477","created":"2025-09-30T18:27:39.233000","resolved":"2025-10-28T17:33:26.030000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-478","created":"2025-10-02T12:36:28.298000","resolved":"2025-12-14T20:42:50.758000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-479","created":"2025-10-02T12:51:51.053000","resolved":"2025-10-06T14:56:14.055000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-480","created":"2025-10-02T12:53:19.431000","resolved":"2025-10-02T16:55:36.445000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-481","created":"2025-10-02T13:03:33.512000","resolved":"2025-10-06T19:43:32.990000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-482","created":"2025-10-03T10:40:17.882000","resolved":"2025-10-06T14:45:48.632000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-483","created":"2025-10-03T12:08:09.140000","resolved":"2025-10-23T14:06:10.084000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-484","created":"2025-10-03T16:09:33.635000","resolved":"2025-10-06T14:45:29.232000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-485","created":"2025-10-06T14:16:34.917000","resolved":"2025-10-06T14:56:24.885000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-486","created":"2025-10-06T14:26:19.181000","resolved":"2025-10-06T14:48:54.461000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-487","created":"2025-10-06T14:28:51.327000","resolved":"2025-10-06T14:29:02.568000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-488","created":"2025-10-06T14:32:14.198000","resolved":"2025-10-06T14:57:38.225000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-489","created":"2025-10-06T14:43:29.159000","resolved":"2025-10-06T14:45:13.597000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-490","created":"2025-10-06T17:57:17.022000","resolved":"2025-10-07T11:21:24.758000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-491","created":"2025-10-07T11:20:43.750000","resolved":"2025-10-07T11:20:51.231000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-492","created":"2025-10-07T13:01:15.629000","resolved":"2025-10-08T16:33:47.855000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-493","created":"2025-10-07T14:48:55.507000","resolved":"2025-10-28T17:35:32.880000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-494","created":"2025-10-08T10:21:05.667000","resolved":"2025-10-08T10:55:31.380000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-495","created":"2025-10-08T17:47:04.200000","resolved":"2025-10-21T18:11:28.637000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-496","created":"2025-10-09T11:47:05.091000","resolved":"2025-10-13T11:28:30.468000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-497","created":"2025-10-10T11:02:07.377000","resolved":"2025-10-10T11:05:46.764000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-498","created":"2025-10-13T10:40:42.288000","resolved":"2025-10-13T10:40:56.783000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-499","created":"2025-10-14T10:34:58.568000","resolved":"2025-10-14T16:34:55.828000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-500","created":"2025-10-15T12:52:15.386000","resolved":"2025-12-14T20:45:10.044000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-501","created":"2025-10-20T10:19:17.022000","resolved":"2025-12-24T15:34:27.788000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-502","created":"2025-10-20T10:57:21.307000","resolved":"2025-10-28T17:30:34.148000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-503","created":"2025-10-20T15:21:36.743000","resolved":"2025-12-24T14:33:56.559000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-504","created":"2025-10-20T17:24:03.413000","resolved":"2025-10-20T17:36:15.711000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-505","created":"2025-10-21T10:20:53.485000","resolved":"2025-10-21T14:23:47.290000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-507","created":"2025-10-22T12:21:48.371000","resolved":"2025-10-22T16:47:52.966000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-508","created":"2025-10-22T18:27:06.871000","resolved":"2025-10-28T17:47:00.008000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-509","created":"2025-10-24T13:07:41.006000","resolved":"2025-10-24T15:40:24.412000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-510","created":"2025-10-27T12:51:56.868000","resolved":"2025-12-24T14:34:42.354000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-511","created":"2025-10-27T13:09:39.712000","resolved":"2025-12-24T15:35:23.960000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-512","created":"2025-10-27T13:59:44.240000","resolved":"2025-10-28T17:27:58.384000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-513","created":"2025-10-27T17:12:44.550000","resolved":"2026-01-21T13:33:46.752000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-514","created":"2025-10-27T17:29:48.637000","resolved":"2025-10-28T16:36:37.140000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-515","created":"2025-10-28T14:55:48.417000","resolved":"2025-10-28T14:55:56.009000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-517","created":"2025-10-28T17:40:08.049000","resolved":"2025-12-14T20:44:00.567000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-518","created":"2025-10-29T10:15:43.146000","resolved":"2026-01-21T13:31:45.898000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-519","created":"2025-10-29T10:17:12.893000","resolved":"2025-11-10T17:52:56.492000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-520","created":"2025-10-29T10:20:01.905000","resolved":"2025-12-14T20:43:26.788000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-521","created":"2025-10-29T10:20:48.178000","resolved":"2025-12-10T11:36:29.093000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-522","created":"2025-10-29T10:21:35.032000","resolved":"2025-12-14T20:43:46.040000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-523","created":"2025-10-29T12:09:47.729000","resolved":"2025-12-24T14:22:50.264000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-524","created":"2025-10-29T13:32:12.650000","resolved":"2025-12-24T15:31:47.504000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-525","created":"2025-10-30T10:40:33.576000","resolved":"2025-10-30T12:05:59.242000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-526","created":"2025-10-30T14:26:52.133000","resolved":"2025-12-24T14:33:19.391000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-527","created":"2025-10-31T13:50:20.988000","resolved":"2025-12-10T11:37:09.391000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-528","created":"2025-11-01T13:40:08.889000","resolved":"2025-11-17T17:11:00.526000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-529","created":"2025-11-01T15:08:16.238000","resolved":"2025-11-10T16:19:06.490000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-530","created":"2025-11-05T15:31:16.805000","resolved":"2025-11-10T16:12:04.459000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-531","created":"2025-11-05T15:52:51.775000","resolved":"2025-12-11T14:50:23.191000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-532","created":"2025-11-06T12:00:04.618000","resolved":"2025-11-10T16:26:45.910000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-533","created":"2025-11-06T16:40:22.419000","resolved":"2025-11-10T16:16:20.824000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-534","created":"2025-11-07T11:32:40.579000","resolved":"2025-12-04T10:10:05.013000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-535","created":"2025-11-07T11:34:39.402000","resolved":"2025-12-24T18:31:05.115000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-536","created":"2025-11-10T13:18:39.062000","resolved":"2025-11-10T15:48:10.799000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-537","created":"2025-11-10T13:19:47.995000","resolved":"2025-12-24T16:49:02.827000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-538","created":"2025-11-11T11:49:32.173000","resolved":"2025-11-17T17:07:09.812000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-539","created":"2025-11-11T12:30:06.175000","resolved":"2025-12-24T18:31:39.398000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-540","created":"2025-11-13T13:14:08.272000","resolved":"2025-11-13T13:14:49.554000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-541","created":"2025-11-14T16:04:13.856000","resolved":"2025-11-18T14:00:12.009000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-542","created":"2025-11-14T16:05:11.929000","resolved":"2025-12-11T14:52:55.761000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-543","created":"2025-11-14T16:56:02.427000","resolved":"2025-11-18T15:42:52.665000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-544","created":"2025-11-17T12:23:55.300000","resolved":"2025-11-17T17:12:54.666000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-545","created":"2025-11-17T15:04:19.026000","resolved":"2025-12-24T15:39:16.179000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-557","created":"2025-11-20T13:17:51.428000","resolved":"2025-11-20T13:32:39.965000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-558","created":"2025-11-20T13:32:53.942000","resolved":"2025-12-04T10:10:51.036000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-559","created":"2025-11-20T13:34:25.081000","resolved":"2026-01-21T13:27:31.808000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-560","created":"2025-11-20T13:35:11.237000","resolved":"2026-01-21T11:55:20.446000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-561","created":"2025-11-20T14:27:44.342000","resolved":"2025-12-04T10:12:24.036000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-562","created":"2025-11-20T15:21:13.946000","resolved":"2025-12-04T10:14:07.827000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-636","created":"2025-11-26T10:41:10.042000","resolved":"2025-12-24T15:39:59.831000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-637","created":"2025-11-26T10:43:31.060000","resolved":"2025-12-14T20:40:14.271000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-638","created":"2025-11-26T14:49:39.893000","resolved":"2025-12-04T10:14:42.903000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-639","created":"2025-11-27T10:56:34.498000","resolved":"2025-12-11T14:52:13.685000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-640","created":"2025-11-27T10:57:56.501000","resolved":"2025-12-04T10:34:35.055000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-641","created":"2025-11-27T10:58:50.902000","resolved":"2025-11-27T10:59:15.654000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-642","created":"2025-11-27T11:01:20.093000","resolved":"2025-12-24T15:43:08.912000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-643","created":"2025-12-02T17:59:25.471000","resolved":"2026-01-21T11:54:32.595000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-644","created":"2025-12-03T16:58:02.950000","resolved":"2025-12-11T14:51:10.478000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-645","created":"2025-12-04T10:03:27.717000","resolved":"2026-01-14T19:13:17.757000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-646","created":"2025-12-04T10:04:29.217000","resolved":null,"priority":"Низкий","state":"PAUSED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-647","created":"2025-12-04T10:05:23.419000","resolved":"2026-01-19T12:13:33.777000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-648","created":"2025-12-04T10:16:34.333000","resolved":"2025-12-04T10:16:46.413000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-649","created":"2025-12-04T10:17:58.500000","resolved":"2025-12-11T14:51:26.252000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-650","created":"2025-12-04T10:22:53.104000","resolved":"2026-01-14T16:32:39.072000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-651","created":"2025-12-04T10:24:20.382000","resolved":"2025-12-04T10:24:28.669000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-652","created":"2025-12-04T10:33:15.901000","resolved":"2025-12-04T10:33:28.449000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-653","created":"2025-12-04T10:41:47.226000","resolved":"2025-12-11T14:51:44.971000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-654","created":"2025-12-04T11:18:17.805000","resolved":"2025-12-11T14:42:51.887000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-655","created":"2025-12-05T13:13:47.210000","resolved":"2025-12-14T00:15:24.715000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-656","created":"2025-12-05T13:26:51.839000","resolved":"2026-02-16T15:17:37.622000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-666","created":"2025-12-08T22:53:34.527000","resolved":"2025-12-12T12:19:58.472000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-674","created":"2025-12-09T19:05:43.126000","resolved":"2025-12-14T00:14:40.290000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-700","created":"2025-12-09T21:20:09.505000","resolved":"2025-12-12T12:20:09.005000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-701","created":"2025-12-09T21:20:09.587000","resolved":"2025-12-12T12:19:59.562000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-702","created":"2025-12-09T21:20:19.800000","resolved":"2025-12-12T12:20:01.073000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-704","created":"2025-12-09T21:20:28.336000","resolved":"2025-12-12T12:20:07.396000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-706","created":"2025-12-09T21:39:31.017000","resolved":"2025-12-14T00:14:51.810000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-707","created":"2025-12-09T21:39:31.103000","resolved":"2025-12-14T00:14:53.111000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-715","created":"2025-12-09T22:41:26.453000","resolved":"2025-12-12T12:20:02.532000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-721","created":"2025-12-09T23:53:07.064000","resolved":"2025-12-12T12:20:05.828000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-723","created":"2025-12-10T00:02:28.101000","resolved":"2025-12-14T00:14:33.098000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-725","created":"2025-12-10T00:11:31.437000","resolved":"2025-12-14T00:14:36.667000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-736","created":"2025-12-10T17:00:51.316000","resolved":"2025-12-11T15:02:57.936000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-744","created":"2025-12-10T17:39:45.940000","resolved":"2025-12-14T00:14:38.551000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-747","created":"2025-12-10T17:46:59.758000","resolved":"2025-12-14T00:14:54.301000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-748","created":"2025-12-11T14:57:15.817000","resolved":"2025-12-12T21:50:27.012000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-749","created":"2025-12-13T02:03:18.854000","resolved":"2025-12-14T00:14:34.438000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-752","created":"2025-12-14T21:21:57.101000","resolved":"2025-12-15T14:18:55.333000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-757","created":"2025-12-14T23:15:54.969000","resolved":"2025-12-15T14:18:56.579000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-759","created":"2025-12-14T23:17:33.592000","resolved":"2025-12-15T14:18:48.868000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-760","created":"2025-12-14T23:19:27.189000","resolved":"2025-12-15T14:18:53.896000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-763","created":"2025-12-15T00:46:16.872000","resolved":"2025-12-15T14:18:52.539000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-766","created":"2025-12-15T01:05:24.267000","resolved":"2025-12-15T14:18:51.340000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-769","created":"2025-12-15T01:09:58.001000","resolved":"2025-12-15T14:18:50.067000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-772","created":"2025-12-15T14:15:44.590000","resolved":"2026-02-16T15:18:42.664000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-773","created":"2025-12-15T14:16:57.587000","resolved":"2026-01-21T14:14:33.705000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-774","created":"2025-12-15T16:07:09.949000","resolved":"2025-12-15T16:14:45.457000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-775","created":"2025-12-16T11:03:28.818000","resolved":null,"priority":"Средний","state":"PAUSED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-776","created":"2025-12-16T11:04:21.422000","resolved":"2026-01-22T16:47:49.697000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-777","created":"2025-12-16T14:17:34.820000","resolved":"2026-02-14T23:14:26.128000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-778","created":"2025-12-16T14:35:33.872000","resolved":"2026-01-22T16:36:58.439000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-779","created":"2025-12-16T15:27:46.189000","resolved":"2025-12-16T16:41:59.491000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-780","created":"2025-12-17T10:54:03.458000","resolved":"2025-12-18T14:16:37.993000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-781","created":"2025-12-17T11:33:16.304000","resolved":"2025-12-17T13:54:51.731000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-782","created":"2025-12-18T14:29:18.330000","resolved":"2025-12-24T18:24:28.098000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-783","created":"2025-12-19T14:32:08.456000","resolved":"2025-12-19T14:32:08.464000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-784","created":"2025-12-19T14:32:41.777000","resolved":"2025-12-24T18:36:18.707000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-785","created":"2025-12-19T14:36:55.798000","resolved":null,"priority":"Низкий","state":"PAUSED","type":"Обращение","tags":"","escalated":false},{"id":"MCA-786","created":"2025-12-19T15:18:31.292000","resolved":"2025-12-22T13:20:39.135000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-787","created":"2025-12-22T10:29:26.675000","resolved":"2026-02-18T13:54:16.588000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-788","created":"2025-12-22T11:18:18.706000","resolved":"2025-12-24T18:38:22.651000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-789","created":"2025-12-23T12:37:26.283000","resolved":"2026-01-21T13:34:15.510000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-790","created":"2025-12-23T12:38:38.350000","resolved":"2026-01-19T12:25:43.980000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-791","created":"2025-12-24T17:55:14.407000","resolved":"2026-01-12T10:39:58.367000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-792","created":"2025-12-24T17:58:14.984000","resolved":"2025-12-24T17:58:55.991000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-793","created":"2025-12-25T13:42:10.981000","resolved":"2026-01-22T16:49:40.109000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-794","created":"2025-12-25T15:15:56.838000","resolved":"2025-12-25T16:46:17.353000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-795","created":"2025-12-26T13:00:40.634000","resolved":"2025-12-26T13:03:54.591000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-796","created":"2026-01-12T15:19:01.605000","resolved":"2026-01-13T09:42:47.299000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-797","created":"2026-01-15T10:20:22.759000","resolved":"2026-01-15T10:23:36.180000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-798","created":"2026-01-15T18:23:57.725000","resolved":"2026-01-15T18:26:22.646000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-799","created":"2026-01-16T12:10:03.518000","resolved":"2026-01-16T12:10:10.135000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-800","created":"2026-01-19T11:55:47.421000","resolved":"2026-01-20T10:39:58.323000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-801","created":"2026-01-19T14:54:58.305000","resolved":"2026-01-22T16:50:51.811000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-802","created":"2026-01-19T17:21:40.767000","resolved":"2026-02-09T17:25:54.705000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-803","created":"2026-01-20T11:24:37.238000","resolved":"2026-03-16T11:42:55.128000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-804","created":"2026-01-21T10:50:05.455000","resolved":"2026-01-21T14:06:56.895000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-807","created":"2026-01-21T16:15:16.650000","resolved":"2026-01-26T14:24:29.276000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-808","created":"2026-01-21T17:58:28.307000","resolved":"2026-01-22T16:32:01.756000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-809","created":"2026-01-22T15:57:56.602000","resolved":"2026-01-22T15:58:28.413000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-810","created":"2026-01-22T15:58:56.315000","resolved":"2026-01-22T15:59:20.110000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-811","created":"2026-01-22T16:00:06.569000","resolved":null,"priority":"Низкий","state":"PAUSED","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-812","created":"2026-01-26T14:17:53.036000","resolved":"2026-01-26T14:19:37.288000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-813","created":"2026-01-26T14:30:38.596000","resolved":"2026-01-26T14:34:56.259000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-814","created":"2026-01-27T11:11:33.238000","resolved":"2026-01-27T11:14:30.711000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-815","created":"2026-01-27T14:44:09.103000","resolved":"2026-02-09T17:44:52.486000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-816","created":"2026-01-28T15:37:59.425000","resolved":"2026-01-29T14:10:11.235000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-817","created":"2026-01-29T14:23:30.979000","resolved":"2026-01-29T22:23:46.580000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-818","created":"2026-02-02T13:43:50.126000","resolved":"2026-02-04T13:33:49.155000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-819","created":"2026-02-02T14:07:43.981000","resolved":"2026-02-14T22:53:34.996000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-820","created":"2026-02-02T16:28:57.829000","resolved":"2026-02-02T17:17:19.010000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-821","created":"2026-02-02T17:17:30.903000","resolved":"2026-02-09T17:21:11.229000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-822","created":"2026-02-03T13:30:54.998000","resolved":"2026-04-13T02:27:41.014000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-823","created":"2026-02-03T15:04:36.151000","resolved":"2026-02-14T22:43:46.533000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-824","created":"2026-02-04T12:20:42.357000","resolved":"2026-02-18T15:49:31.890000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-825","created":"2026-02-05T10:42:11.661000","resolved":"2026-02-14T22:54:32.306000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-826","created":"2026-02-05T10:43:31.803000","resolved":"2026-02-09T17:41:59.857000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-827","created":"2026-02-05T10:44:43.722000","resolved":"2026-02-09T13:16:16.787000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-828","created":"2026-02-06T11:49:36.194000","resolved":"2026-02-13T12:43:24.115000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-830","created":"2026-02-07T18:13:39.616000","resolved":"2026-02-09T17:20:32.675000","priority":"Критический","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-843","created":"2026-02-09T11:31:31.072000","resolved":"2026-02-09T13:16:01.404000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-844","created":"2026-02-09T11:33:20.887000","resolved":"2026-02-13T01:55:59.307000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-845","created":"2026-02-10T15:49:25.418000","resolved":"2026-03-18T12:25:16.236000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-846","created":"2026-02-10T16:18:20.917000","resolved":null,"priority":"Низкий","state":"IN PROGRESS","type":"Обращение","tags":"","escalated":false},{"id":"MCA-847","created":"2026-02-10T16:33:19.448000","resolved":"2026-02-13T02:08:46.836000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-855","created":"2026-02-15T00:57:35.179000","resolved":"2026-02-24T10:18:48.019000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-863","created":"2026-02-15T19:49:52.259000","resolved":"2026-02-24T10:18:49.653000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-869","created":"2026-02-16T10:49:08.735000","resolved":"2026-02-18T15:53:29.938000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-870","created":"2026-02-16T15:00:54.887000","resolved":"2026-02-18T15:48:41.759000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-871","created":"2026-02-16T15:01:39.639000","resolved":"2026-04-13T11:00:43.001000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-872","created":"2026-02-16T15:30:25.570000","resolved":"2026-02-16T16:46:54.211000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-873","created":"2026-02-17T13:23:08.014000","resolved":"2026-02-19T10:52:45.081000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-874","created":"2026-02-19T10:53:06.161000","resolved":"2026-03-05T16:31:06.828000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-875","created":"2026-02-19T10:54:23.784000","resolved":"2026-03-18T12:12:08.430000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-876","created":"2026-02-20T17:05:15.075000","resolved":"2026-02-22T15:47:05.467000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-877","created":"2026-02-20T17:06:02.201000","resolved":"2026-02-22T15:56:09.212000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-878","created":"2026-02-24T10:15:16.471000","resolved":"2026-02-24T10:15:51.407000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-879","created":"2026-02-24T10:19:23.011000","resolved":"2026-02-27T14:41:21.226000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-880","created":"2026-02-24T11:53:07.154000","resolved":"2026-02-27T14:48:14.653000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-881","created":"2026-02-24T16:03:25.185000","resolved":"2026-03-23T11:31:15.659000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-882","created":"2026-02-24T16:06:02.722000","resolved":"2026-02-27T14:49:16.099000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-883","created":"2026-02-25T10:12:00.381000","resolved":"2026-04-13T02:14:20.346000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-884","created":"2026-02-25T10:13:18.438000","resolved":"2026-03-05T11:54:36.792000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-885","created":"2026-02-26T11:21:23.359000","resolved":"2026-02-27T14:49:48.986000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-886","created":"2026-02-27T13:54:53.710000","resolved":"2026-03-09T23:26:37.893000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-887","created":"2026-03-02T17:27:10.884000","resolved":"2026-03-06T12:19:07.240000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-888","created":"2026-03-02T17:28:07.021000","resolved":"2026-03-02T18:17:47.853000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-889","created":"2026-03-05T11:13:30.767000","resolved":"2026-03-09T23:44:11.680000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-890","created":"2026-03-05T16:33:23.172000","resolved":"2026-03-09T23:46:31.034000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-891","created":"2026-03-06T12:17:09.962000","resolved":"2026-03-11T16:54:43.031000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-892","created":"2026-03-10T15:15:43.469000","resolved":"2026-04-06T02:33:55.705000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-893","created":"2026-03-11T10:53:23.621000","resolved":"2026-03-26T15:39:15.507000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-894","created":"2026-03-11T14:17:30.143000","resolved":"2026-03-16T15:14:52.133000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-895","created":"2026-03-11T14:18:41.625000","resolved":null,"priority":"Низкий","state":"IN PROGRESS","type":"Обращение","tags":"","escalated":false},{"id":"MCA-896","created":"2026-03-11T14:20:47.829000","resolved":"2026-03-16T15:22:16.269000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-897","created":"2026-03-11T14:23:15.720000","resolved":"2026-03-11T14:23:37.904000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-898","created":"2026-03-11T14:26:29.103000","resolved":"2026-03-11T14:26:35.705000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-899","created":"2026-03-11T14:27:48.565000","resolved":"2026-03-16T15:18:19.904000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-900","created":"2026-03-12T19:35:53.176000","resolved":"2026-03-31T10:46:11.651000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-901","created":"2026-03-16T10:54:25.289000","resolved":"2026-03-16T13:28:24.351000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-902","created":"2026-03-16T10:56:05.063000","resolved":"2026-03-16T13:29:20.488000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-903","created":"2026-03-16T11:08:06.556000","resolved":"2026-03-16T13:30:19.480000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-904","created":"2026-03-16T11:08:38.383000","resolved":"2026-04-13T02:10:17.928000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-905","created":"2026-03-16T11:09:56.835000","resolved":"2026-03-16T13:21:46.969000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-906","created":"2026-03-16T11:10:51.050000","resolved":"2026-03-16T11:18:02.304000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-907","created":"2026-03-16T11:12:18.486000","resolved":"2026-03-16T11:17:43.717000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-908","created":"2026-03-16T11:14:51.044000","resolved":"2026-03-16T11:17:23.755000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-909","created":"2026-03-16T11:16:43.924000","resolved":"2026-03-16T13:15:57.950000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-910","created":"2026-03-16T11:17:21.921000","resolved":"2026-03-26T13:22:41.491000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-911","created":"2026-03-17T12:05:01.343000","resolved":"2026-03-23T11:04:36.476000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-912","created":"2026-03-18T11:58:27.452000","resolved":"2026-03-26T15:25:46.986000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-913","created":"2026-03-18T12:16:07.927000","resolved":"2026-03-23T11:16:46.929000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-914","created":"2026-03-19T09:39:08.486000","resolved":"2026-03-19T12:13:56.089000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-915","created":"2026-03-19T21:51:29.978000","resolved":"2026-04-06T02:36:17.280000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-916","created":"2026-03-20T11:38:57.770000","resolved":"2026-03-23T11:16:31.843000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-917","created":"2026-03-20T11:43:55.472000","resolved":"2026-03-23T11:18:20.898000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-918","created":"2026-03-20T11:44:43.441000","resolved":"2026-03-23T11:19:08.493000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-919","created":"2026-03-23T10:49:17.915000","resolved":"2026-03-26T13:23:00.411000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-920","created":"2026-03-23T10:52:53.999000","resolved":"2026-03-26T15:49:36.364000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-921","created":"2026-03-23T10:53:26.191000","resolved":"2026-03-30T12:02:30.789000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-922","created":"2026-03-23T10:53:57.281000","resolved":"2026-03-26T15:51:31.685000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-923","created":"2026-03-23T10:54:42.403000","resolved":"2026-03-23T11:27:42.785000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-924","created":"2026-03-23T10:56:22.057000","resolved":"2026-03-26T15:40:47.045000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-925","created":"2026-03-23T16:00:10.917000","resolved":"2026-03-26T15:53:32.126000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-926","created":"2026-03-23T17:51:22.635000","resolved":"2026-03-26T15:54:08.452000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-927","created":"2026-03-24T11:40:38.718000","resolved":"2026-03-24T11:40:45.931000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-928","created":"2026-03-24T11:41:18.036000","resolved":"2026-04-13T02:12:52.879000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-929","created":"2026-03-25T10:22:23.568000","resolved":"2026-03-30T12:04:03.770000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-930","created":"2026-03-25T15:58:05.073000","resolved":"2026-03-26T13:41:20.562000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-931","created":"2026-03-27T11:09:17.521000","resolved":"2026-03-30T12:05:44.986000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Звезда","escalated":false},{"id":"MCA-932","created":"2026-03-27T11:14:07.114000","resolved":null,"priority":"Средний","state":"IN PROGRESS","type":"Обращение","tags":"Звезда","escalated":false},{"id":"MCA-933","created":"2026-03-27T11:17:06.740000","resolved":"2026-03-30T12:04:19.252000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Звезда,Создана задача","escalated":true},{"id":"MCA-934","created":"2026-03-27T11:20:01.225000","resolved":"2026-03-30T12:04:37.373000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Звезда","escalated":false},{"id":"MCA-935","created":"2026-03-27T12:15:16.638000","resolved":"2026-04-06T12:13:26.729000","priority":"Высокий","state":"DONE","type":"Обращение","tags":"Звезда","escalated":false},{"id":"MCA-936","created":"2026-03-27T17:12:35.832000","resolved":"2026-04-06T02:29:18.417000","priority":"Средний","state":"DONE","type":"Обращение","tags":"Звезда","escalated":false},{"id":"MCA-937","created":"2026-03-30T11:52:47.224000","resolved":"2026-04-06T02:55:26.190000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-938","created":"2026-03-30T11:59:51.250000","resolved":"2026-04-06T02:39:26.220000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-939","created":"2026-03-31T10:45:09.425000","resolved":"2026-04-06T02:39:16.897000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-940","created":"2026-03-31T10:48:39.445000","resolved":"2026-04-06T02:40:33.155000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-941","created":"2026-03-31T11:53:59.406000","resolved":"2026-04-06T10:05:38.226000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-942","created":"2026-03-31T16:43:23.467000","resolved":"2026-04-06T02:42:15.091000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-943","created":"2026-03-31T17:22:32.341000","resolved":"2026-04-06T02:43:34.197000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-944","created":"2026-03-31T17:59:51.603000","resolved":"2026-04-06T02:44:15.579000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-945","created":"2026-04-01T11:24:13.205000","resolved":"2026-04-06T10:31:47.688000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-946","created":"2026-04-01T11:24:57.636000","resolved":"2026-04-06T02:45:53.300000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-947","created":"2026-04-02T11:03:59.522000","resolved":"2026-04-06T02:47:28.418000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-948","created":"2026-04-02T11:04:54.171000","resolved":"2026-04-06T02:55:13.035000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-949","created":"2026-04-03T10:47:41.301000","resolved":"2026-04-06T02:49:45.023000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-950","created":"2026-04-03T10:58:02.996000","resolved":"2026-04-06T02:48:35.406000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-951","created":"2026-04-06T09:17:22.836000","resolved":"2026-04-06T09:43:21.029000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-952","created":"2026-04-07T10:37:05.629000","resolved":"2026-04-14T10:38:48.990000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-953","created":"2026-04-07T15:04:09.233000","resolved":"2026-04-13T02:09:14.251000","priority":"Средний","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-954","created":"2026-04-09T11:49:40.496000","resolved":"2026-04-13T02:12:20.455000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-955","created":"2026-04-09T15:57:04.918000","resolved":"2026-04-13T11:04:28.461000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-956","created":"2026-04-13T11:04:57.565000","resolved":null,"priority":"Низкий","state":"IN PROGRESS","type":"Обращение","tags":"","escalated":false},{"id":"MCA-957","created":"2026-04-13T11:21:55.732000","resolved":"2026-04-13T11:34:39.019000","priority":"Низкий","state":"DONE","type":"Обращение","tags":"","escalated":false},{"id":"MCA-958","created":"2026-04-13T11:38:48.271000","resolved":null,"priority":"Низкий","state":"PENDING","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-959","created":"2026-04-13T14:03:07.089000","resolved":null,"priority":"Средний","state":"PENDING","type":"Обращение","tags":"Создана задача","escalated":true},{"id":"MCA-960","created":"2026-04-14T12:27:01.436000","resolved":null,"priority":"Средний","state":"PENDING","type":"Обращение","tags":"","escalated":false}];</script>
+
+  <h1>Служба поддержки — анализ обращений за 2024–2026 гг.</h1>
+  <p class="sub">
+    Отчёт открывается <strong>сразу</strong> — таблица уже встроена в этот HTML. Дополнительно можно загрузить другой .xlsx/.csv (сохранится в браузере). Колонка <span class="badge">Теги</span> — для «созданной задачи».
+  </p>
+
+  <div class="toolbar">
+    <label class="file-btn">Выбрать Excel или CSV<input type="file" id="csvFile" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+    <button type="button" class="secondary" id="btnClearCache">Очистить сохранённые данные</button>
+    <span class="hint" id="statusText"></span>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="section-title">Динамика и сравнение периодов</div>
+
+  <div class="section-title" style="margin-top:8px;">Созданная задача — эскалация в разработку</div>
+  <p class="sub" style="margin-top:-8px;margin-bottom:16px;">Сравнение обращений, по которым позже заведены баг, фича-реквест или таска (метка в YouTrack), с обращениями без созданной задачи.</p>
+  <div class="card">
+    <h2>Создано по месяцам: с созданной задачей и без</h2>
+    <p class="desc">Стек: сколько из потока ушло в последующую задачу в трекере — индикатор «нагрузки на продукт».</p>
+    <div class="chart-wrap tall"><canvas id="chTagStack"></canvas></div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h2>Доля с созданной задачей (% от созданных в месяце)</h2>
+      <p class="desc">Рост доли может отражать и зрелость проставления меток, и реальный рост отложенной работы для команды разработки.</p>
+      <div class="chart-wrap"><canvas id="chTagPct"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Медиана дней до закрытия: с созданной задачей и без</h2>
+      <p class="desc">По закрытым обращениям в каждом месяце отдельно. Если в одной из групп мало закрытий — точка может отсутствовать.</p>
+      <div class="chart-wrap"><canvas id="chTagMedian"></canvas></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h2>2024, 2025 и 2026 по месяцам — только обращения с созданной задачей</h2>
+      <p class="desc">Тот же формат: три столбца рядом на каждый месяц; считаются только обращения с созданной задачей.</p>
+      <p class="desc" id="yoyTagPlaceholder" style="display:none;">Нет данных для построения.</p>
+      <div class="chart-wrap" id="yoyTagChartHost"><canvas id="chYoYTag"></canvas></div>
+      <div id="yoyTagInsight"></div>
+    </div>
+    <div class="card">
+      <h2>Итого за период: с созданной задачей и без</h2>
+      <p class="desc">Доля обращений с последующей задачей в трекере и доля без созданной задачи (если в файле нет колонки «Теги», все строки попадут во вторую группу).</p>
+      <div class="chart-wrap"><canvas id="chTagDonut"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Обращения по месяцам (создано vs закрыто)</h2>
+    <p class="desc">Объём потока: рост числа обращений не всегда «плохо» — смотрите вместе со временем решения и долей критичных.</p>
+    <div class="chart-wrap tall"><canvas id="chVolume"></canvas></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>Приоритеты по месяцам (стек)</h2>
+      <p class="desc">Структура нагрузки: сдвиг в сторону критичных — сигнал для процессов и найма.</p>
+      <div class="chart-wrap"><canvas id="chPriority"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Скорость: медиана дней до закрытия</h2>
+      <p class="desc">По закрытым тикетам. Меньше — быстрее обработка (при стабильной классификации приоритетов).</p>
+      <div class="chart-wrap"><canvas id="chMedian"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>SLA-подобные пороги (доля закрытых в срок)</h2>
+      <p class="desc">Доля обращений с датой закрытия в пределах 1 / 3 / 7 суток от создания. Настройте пороги под свой регламент.</p>
+      <div class="chart-wrap"><canvas id="chSLA"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Накопленный «хвост»: создано минус закрыто (кумулятивно)</h2>
+      <p class="desc">Упрощённый индикатор давления на очередь без снимков бэклога. Рост кривой — очередь не успевает разгребаться.</p>
+      <div class="chart-wrap"><canvas id="chBacklog"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Сравнение 2024, 2025 и 2026 по месяцам (три столбца рядом)</h2>
+    <p class="desc">
+      По горизонтали — месяцы (Янв … Дек). В <strong>каждой группе три столбца рядом</strong>: сколько обращений <strong>создано</strong> в этом месяце в <strong>2024</strong>, <strong>2025</strong> и <strong>2026</strong> годах.
+      Если за месяц в файле нет данных для года — столбец с нулём. Другие годы на этом графике не показываются.
+    </p>
+    <p class="desc" id="yoyPlaceholder" style="display:none;">Нет данных для построения (загрузите файл).</p>
+    <div class="chart-wrap" id="yoyChartHost"><canvas id="chYoY"></canvas></div>
+    <div id="yoyInsight"></div>
+  </div>
+
+  <div class="card">
+    <h2>Сводка по месяцам</h2>
+    <p class="desc">Таблица для выгрузки в презентацию или совещание. Колонка <strong>&gt;10 дн %</strong> — доля закрытых в этом месяце обращений, у которых от создания до закрытия прошло <strong>больше 10 суток</strong> (по датам в файле).</p>
+    <div style="overflow-x: auto;"><table id="monthTable"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <script>
+(function () {
+  const MONTH_NAMES = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+
+  /** Сравнение YoY: эти три года — три столбца рядом по каждому месяцу */
+  const YOY_YEARS = [2024, 2025, 2026];
+  const YOY_BAR_COLORS = [
+    'rgba(52,211,153,0.8)',
+    'rgba(77,163,255,0.75)',
+    'rgba(167,139,250,0.75)'
+  ];
+  const YOY_TAG_BAR_COLORS = [
+    'rgba(52,211,153,0.75)',
+    'rgba(244,114,182,0.7)',
+    'rgba(167,139,250,0.7)'
+  ];
+
+  const COL_ALIASES = {
+    created: ['создано','создана','created','дата создания','дата','start','открыт','created date','дата поступления'],
+    resolved: ['закрыто','завершенная','завершённая','resolved','дата закрытия','завершено','completed','решено','closed','end','дата решения','дата завершения'],
+    priority: ['приоритет','priority','важность','severity'],
+    state: ['состояние','state','status','статус','этап'],
+    type: ['тип','type','категория','category'],
+    id: ['id','ключ','issue','ticket','номер'],
+    tags: ['теги','tags','labels','метки','tag']
+  };
+
+  /** Метка «Создана задача» в YouTrack (в т.ч. в списке через запятую, напр. «Звезда,Создана задача») */
+  function hasCreatedTaskTag(tagsStr) {
+    const s = norm(tagsStr);
+    if (!s) return false;
+    return s.indexOf('создана задача') !== -1;
+  }
+
+  function norm(s) {
+    return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function mapColumns(headers) {
+    const h = headers.map(norm);
+    const out = {};
+    for (const [field, aliases] of Object.entries(COL_ALIASES)) {
+      for (const a of aliases) {
+        const idx = h.findIndex(x => x === a || x.includes(a));
+        if (idx >= 0) { out[field] = headers[idx]; break; }
+      }
+    }
+    return out;
+  }
+
+  function parseDate(val) {
+    if (val == null || val === '') return null;
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    if (typeof val === 'number' && !isNaN(val)) {
+      if (val > 20000 && val < 100000) {
+        const epoch = Date.UTC(1899, 11, 30);
+        const ms = epoch + val * 86400000;
+        const d = new Date(ms);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    const s = String(val).trim();
+    let d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+    const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+    if (m) d = new Date(+m[3], +m[2] - 1, +m[1]);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function monthKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  function monthLabel(key) {
+    const [y, m] = key.split('-').map(Number);
+    return MONTH_NAMES[m - 1] + ' ' + y;
+  }
+
+  function priorityBucket(p) {
+    const x = norm(p);
+    if (!x) return 'Не указан';
+    if (/крит|critical|p1|blocker/i.test(x)) return 'Критический';
+    if (/высок|high|major|p2/i.test(x)) return 'Высокий';
+    if (/низк|low|minor|p4/i.test(x)) return 'Низкий';
+    if (/средн|medium|normal|p3/i.test(x)) return 'Средний';
+    return p.trim() || 'Не указан';
+  }
+
+  function rowsFromParsed(parsed, colMap) {
+    const c = colMap.created;
+    if (!c) {
+      const fld = parsed.meta && parsed.meta.fields ? parsed.meta.fields.join(', ') : '';
+      throw new Error('Не найдена колонка даты создания (Создано, Created, …). Колонки в файле: ' + (fld || '—'));
+    }
+    const out = [];
+    for (const row of parsed.data) {
+      if (!row || row[c] == null) continue;
+      const created = parseDate(row[c]);
+      if (!created) continue;
+      const resolvedCol = colMap.resolved;
+      let resolved = resolvedCol ? parseDate(row[resolvedCol]) : null;
+      if (resolved && resolved < created) resolved = null;
+      const tagsRaw = colMap.tags ? String(row[colMap.tags] != null ? row[colMap.tags] : '') : '';
+      const escalated = hasCreatedTaskTag(tagsRaw);
+      out.push({
+        id: colMap.id ? row[colMap.id] : '',
+        created,
+        resolved,
+        priority: colMap.priority ? priorityBucket(row[colMap.priority]) : 'Не указан',
+        state: colMap.state ? String(row[colMap.state] || '') : '',
+        type: colMap.type ? String(row[colMap.type] || '') : '',
+        tags: tagsRaw,
+        escalated: escalated
+      });
+    }
+    return out;
+  }
+
+  function collectHeadersFromRows(rows) {
+    const keySet = {};
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || typeof row !== 'object') continue;
+      const keys = Object.keys(row);
+      for (let j = 0; j < keys.length; j++) keySet[keys[j]] = true;
+    }
+    return Object.keys(keySet);
+  }
+
+  function rowsFromObjectArray(rows) {
+    const headers = collectHeadersFromRows(rows);
+    const colMap = mapColumns(headers);
+    return rowsFromParsed({ data: rows, meta: { fields: headers } }, colMap);
+  }
+
+  function loadXlsxFile(file, onDone, onErr) {
+    if (typeof XLSX === 'undefined') {
+      onErr(new Error('Библиотека XLSX не загрузилась. Проверьте сеть и обновите страницу.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        const buf = new Uint8Array(e.target.result);
+        const wb = XLSX.read(buf, { type: 'array', cellDates: true, cellNF: false });
+        if (!wb.SheetNames || !wb.SheetNames.length) throw new Error('В книге нет листов');
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
+        const rows = json.filter(function (r) {
+          if (!r || typeof r !== 'object') return false;
+          for (const k in r) {
+            if (Object.prototype.hasOwnProperty.call(r, k) && r[k] !== '' && r[k] != null) return true;
+          }
+          return false;
+        });
+        onDone(rows, sheetName);
+      } catch (err) {
+        onErr(err);
+      }
+    };
+    reader.onerror = function () { onErr(new Error('Не удалось прочитать файл')); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  var LS_KEY_ROWS = 'support_bi_v1_rows';
+
+  function serializeRows(rows) {
+    return JSON.stringify(rows.map(function (r) {
+      return {
+        id: r.id,
+        created: r.created instanceof Date ? r.created.toISOString() : r.created,
+        resolved: r.resolved ? (r.resolved instanceof Date ? r.resolved.toISOString() : r.resolved) : null,
+        priority: r.priority,
+        state: r.state,
+        type: r.type,
+        tags: r.tags,
+        escalated: !!r.escalated
+      };
+    }));
+  }
+
+  function deserializeRows(jsonStr) {
+    var arr = JSON.parse(jsonStr);
+    return arr.map(function (r) {
+      return {
+        id: r.id,
+        created: new Date(r.created),
+        resolved: r.resolved ? new Date(r.resolved) : null,
+        priority: r.priority,
+        state: r.state,
+        type: r.type,
+        tags: r.tags || '',
+        escalated: !!r.escalated
+      };
+    });
+  }
+
+  function saveRowsToStorage(rows) {
+    try {
+      localStorage.setItem(LS_KEY_ROWS, serializeRows(rows));
+    } catch (err) {
+      console.warn('Не удалось сохранить в localStorage', err);
+    }
+  }
+
+  function loadRowsFromStorage() {
+    try {
+      var s = localStorage.getItem(LS_KEY_ROWS);
+      if (!s) return null;
+      return deserializeRows(s);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function aggregate(rows) {
+    const byMonth = {};
+    const ensure = (key) => {
+      if (!byMonth[key]) {
+        byMonth[key] = {
+          created: 0, closed: 0,
+          createdWithTask: 0,
+          pri: { 'Критический': 0, 'Высокий': 0, 'Средний': 0, 'Низкий': 0, 'Не указан': 0 },
+          resolveDays: [],
+          resolveDaysWithTask: [],
+          resolveDaysWithoutTask: [],
+          sla1: 0, sla3: 0, sla7: 0, slaDenom: 0,
+          closedOver10d: 0
+        };
+      }
+      return byMonth[key];
+    };
+
+    for (const r of rows) {
+      const mk = monthKey(r.created);
+      const b = ensure(mk);
+      b.created++;
+      const esc = !!r.escalated;
+      if (esc) b.createdWithTask++;
+      b.pri[r.priority] = (b.pri[r.priority] || 0) + 1;
+      if (r.resolved) {
+        b.closed++;
+        const days = (r.resolved - r.created) / 86400000;
+        b.resolveDays.push(days);
+        if (esc) b.resolveDaysWithTask.push(days);
+        else b.resolveDaysWithoutTask.push(days);
+        b.slaDenom++;
+        if (days <= 1) b.sla1++;
+        if (days <= 3) b.sla3++;
+        if (days <= 7) b.sla7++;
+        if (days > 10) b.closedOver10d++;
+      }
+    }
+
+    const keys = Object.keys(byMonth).sort();
+    let cum = 0;
+    const backlogCum = keys.map(k => {
+      const b = byMonth[k];
+      cum += b.created - b.closed;
+      return { key: k, value: cum };
+    });
+
+    const median = (arr) => {
+      if (!arr.length) return null;
+      const s = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    };
+
+    const monthly = keys.map(k => {
+      const b = byMonth[k];
+      const med = median(b.resolveDays);
+      const medWT = median(b.resolveDaysWithTask);
+      const medWo = median(b.resolveDaysWithoutTask);
+      const cw = b.createdWithTask || 0;
+      const cwo = b.created - cw;
+      return {
+        key: k,
+        label: monthLabel(k),
+        created: b.created,
+        closed: b.closed,
+        createdWithTask: cw,
+        createdWithoutTask: cwo,
+        pctWithTask: b.created ? (cw / b.created) * 100 : null,
+        pri: { ...b.pri },
+        medianDays: med,
+        medianDaysWithTask: medWT,
+        medianDaysWithoutTask: medWo,
+        sla1: b.slaDenom ? b.sla1 / b.slaDenom : null,
+        sla3: b.slaDenom ? b.sla3 / b.slaDenom : null,
+        sla7: b.slaDenom ? b.sla7 / b.slaDenom : null,
+        pctClosedOver10d: b.slaDenom ? (b.closedOver10d / b.slaDenom) * 100 : null
+      };
+    });
+
+    return { monthly, backlogCum, byMonth, keys };
+  }
+
+  function yoyCompare(monthly, getVal, yearsFixed) {
+    const pick = typeof getVal === 'function' ? getVal : function (m) { return m.created; };
+    const byYearMonth = {};
+    for (let i = 0; i < monthly.length; i++) {
+      const m = monthly[i];
+      const parts = m.key.split('-').map(Number);
+      const y = parts[0];
+      const mo = parts[1];
+      if (!byYearMonth[mo]) byYearMonth[mo] = {};
+      const v = pick(m);
+      byYearMonth[mo][y] = typeof v === 'number' && !isNaN(v) ? v : null;
+    }
+    var years = yearsFixed && yearsFixed.length ? yearsFixed : (function () {
+      const ys = [...new Set(monthly.map(function (x) { return +x.key.split('-')[0]; }))].sort();
+      if (ys.length < 2) return [];
+      return [ys[0], ys[ys.length - 1]];
+    })();
+    if (!years.length) return { labels: [], series: [] };
+    const labels = MONTH_NAMES;
+    const series = years.map(function (yr) {
+      const arr = [];
+      for (let mo = 1; mo <= 12; mo++) {
+        const o = byYearMonth[mo] || {};
+        const v = o[yr];
+        arr.push(v != null && !isNaN(v) ? v : 0);
+      }
+      return { year: yr, data: arr };
+    });
+    return { labels: labels, series: series };
+  }
+
+  function kpiCards(rows, monthly) {
+    const total = rows.length;
+    const closed = rows.filter(r => r.resolved).length;
+    const open = total - closed;
+    const allDays = rows.filter(r => r.resolved).map(r => (r.resolved - r.created) / 86400000);
+    const medAll = allDays.length ? (() => {
+      const s = [...allDays].sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    })() : null;
+
+    const half = Math.floor(monthly.length / 2);
+    const m1 = monthly.slice(0, half);
+    const m2 = monthly.slice(half);
+    const avgMedian = (ms) => {
+      const vals = ms.map(x => x.medianDays).filter(v => v != null && !isNaN(v));
+      if (!vals.length) return null;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    };
+    const earlyMed = avgMedian(m1);
+    const lateMed = avgMedian(m2);
+    let medDelta = null;
+    if (earlyMed != null && lateMed != null && earlyMed > 0) {
+      medDelta = ((lateMed - earlyMed) / earlyMed) * 100;
+    }
+
+    const critShare = (ms) => {
+      let c = 0, t = 0;
+      for (const x of ms) {
+        for (const [k, v] of Object.entries(x.pri)) {
+          t += v;
+          if (k === 'Критический') c += v;
+        }
+      }
+      return t ? c / t : null;
+    };
+    const cs1 = critShare(m1);
+    const cs2 = critShare(m2);
+    let critDelta = (cs1 != null && cs2 != null) ? ((cs2 - cs1) * 100) : null;
+
+    const tagShare = function (ms) {
+      let e = 0, t = 0;
+      for (let i = 0; i < ms.length; i++) {
+        t += ms[i].created;
+        e += ms[i].createdWithTask || 0;
+      }
+      return t ? e / t : null;
+    };
+    const ts1 = tagShare(m1);
+    const ts2 = tagShare(m2);
+    let tagDeltaPp = (ts1 != null && ts2 != null) ? (ts2 - ts1) * 100 : null;
+    const tagTotal = rows.filter(function (r) { return r.escalated; }).length;
+    const tagPctAll = total ? ((tagTotal / total) * 100).toFixed(1) : '0';
+
+    const el = document.getElementById('kpiRow');
+    el.innerHTML = '';
+    const items = [
+      { l: 'Всего обращений', v: total, d: null },
+      { l: 'С созданной задачей', v: tagTotal, d: null },
+      { l: 'Доля с созданной задачей (весь период)', v: tagPctAll + '%', d: null },
+      { l: 'Закрыто с датой', v: closed, d: null },
+      { l: 'Без даты закрытия', v: open, d: null },
+      { l: 'Медиана дней (все закрытые)', v: medAll != null ? medAll.toFixed(2) : '—', d: null },
+      { l: 'Δ медианы (2-я половина vs 1-я)', v: medDelta != null ? (medDelta > 0 ? '+' + medDelta.toFixed(1) + '%' : medDelta.toFixed(1) + '%') : '—',
+        cls: medDelta == null ? null : (medDelta > 0 ? 'up' : (medDelta < 0 ? 'down' : 'neutral')),
+        hint: medDelta == null ? '' : (medDelta < 0 ? 'быстрее' : medDelta > 0 ? 'медленнее' : 'без изменений') },
+      { l: 'Δ доли критичных (п.п., 2-я vs 1-я пол.)', v: critDelta != null ? (critDelta > 0 ? '+' + critDelta.toFixed(1) : critDelta.toFixed(1)) : '—',
+        cls: critDelta == null ? null : (critDelta > 0 ? 'up' : (critDelta < 0 ? 'down' : 'neutral')),
+        hint: critDelta == null ? '' : (critDelta > 0 ? 'больше критичных' : critDelta < 0 ? 'меньше критичных' : 'без изменений') },
+      { l: 'Δ доли с созданной задачей (п.п., 2-я vs 1-я пол.)', v: tagDeltaPp != null ? (tagDeltaPp > 0 ? '+' + tagDeltaPp.toFixed(1) : tagDeltaPp.toFixed(1)) : '—',
+        cls: tagDeltaPp == null ? null : (tagDeltaPp > 0 ? 'up' : (tagDeltaPp < 0 ? 'down' : 'neutral')),
+        hint: tagDeltaPp == null ? '' : (tagDeltaPp > 0 ? 'больше с задачей' : tagDeltaPp < 0 ? 'меньше с задачей' : 'без изменений') }
+    ];
+    for (const it of items) {
+      const div = document.createElement('div');
+      div.className = 'kpi';
+      const delta = it.cls ? '<div class="delta ' + it.cls + '">' + (it.hint || '') + '</div>' : '';
+      div.innerHTML = '<div class="v">' + it.v + '</div><div class="l">' + it.l + '</div>' + delta;
+      el.appendChild(div);
+    }
+  }
+
+  let charts = {};
+
+  function destroyChart(id) {
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  }
+
+  function render(rows) {
+    const { monthly, backlogCum } = aggregate(rows);
+    kpiCards(rows, monthly);
+
+    const labels = monthly.map(m => m.label);
+    const created = monthly.map(m => m.created);
+    const closed = monthly.map(m => m.closed);
+
+    destroyChart('tagStack');
+    charts.tagStack = new Chart(document.getElementById('chTagStack'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'С созданной задачей', data: monthly.map(m => m.createdWithTask || 0), backgroundColor: 'rgba(244,114,182,0.85)', borderRadius: 4 },
+          { label: 'Без созданной задачи', data: monthly.map(m => m.createdWithoutTask || 0), backgroundColor: 'rgba(148,163,184,0.55)', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    destroyChart('tagPct');
+    charts.tagPct = new Chart(document.getElementById('chTagPct'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Доля с созданной задачей, %',
+          data: monthly.map(m => m.pctWithTask != null ? m.pctWithTask : null),
+          borderColor: '#f472b6',
+          backgroundColor: 'rgba(244,114,182,0.12)',
+          fill: true,
+          tension: 0.25,
+          spanGaps: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { min: 0, max: 100, ticks: { color: '#8b95a5', callback: function (v) { return v + '%'; } }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    destroyChart('tagMed');
+    charts.tagMed = new Chart(document.getElementById('chTagMedian'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'С созданной задачей (медиана дн.)', data: monthly.map(m => m.medianDaysWithTask), borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,0.08)', fill: false, tension: 0.25, spanGaps: true },
+          { label: 'Без созданной задачи (медиана дн.)', data: monthly.map(m => m.medianDaysWithoutTask), borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.08)', fill: false, tension: 0.25, spanGaps: true }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    const tagWt = rows.filter(function (r) { return r.escalated; }).length;
+    const tagWo = rows.length - tagWt;
+    destroyChart('tagDonut');
+    charts.tagDonut = new Chart(document.getElementById('chTagDonut'), {
+      type: 'doughnut',
+      data: {
+        labels: ['С созданной задачей', 'Без созданной задачи'],
+        datasets: [{
+          data: [tagWt, tagWo],
+          backgroundColor: ['rgba(244,114,182,0.85)', 'rgba(148,163,184,0.55)'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#8b95a5' } }
+        }
+      }
+    });
+
+    const yoyTag = yoyCompare(monthly, function (m) { return m.createdWithTask; }, YOY_YEARS);
+    destroyChart('yoyTag');
+    const yoyTagInsight = document.getElementById('yoyTagInsight');
+    const yoyTagPh = document.getElementById('yoyTagPlaceholder');
+    const yoyTagHost = document.getElementById('yoyTagChartHost');
+    yoyTagInsight.innerHTML = '';
+    const yoyTagOk = monthly.length > 0 && yoyTag.labels && yoyTag.labels.length && yoyTag.series && yoyTag.series.length;
+    if (yoyTagOk) {
+      yoyTagPh.style.display = 'none';
+      yoyTagHost.style.display = 'block';
+      charts.yoyTag = new Chart(document.getElementById('chYoYTag'), {
+        type: 'bar',
+        data: {
+          labels: yoyTag.labels,
+          datasets: yoyTag.series.map(function (s, idx) {
+            return {
+              label: s.year + ' г., с задачей',
+              data: s.data,
+              backgroundColor: YOY_TAG_BAR_COLORS[idx % YOY_TAG_BAR_COLORS.length],
+              borderRadius: 4
+            };
+          })
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#8b95a5' } }, tooltip: { mode: 'index', intersect: false } },
+          datasets: { bar: { maxBarThickness: 18 } },
+          scales: {
+            x: { ticks: { color: '#8b95a5' }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+          }
+        }
+      });
+      const parts = yoyTag.series.map(function (s) {
+        const sum = s.data.reduce(function (a, b) { return a + (b || 0); }, 0);
+        return s.year + ': ' + sum;
+      });
+      const divT = document.createElement('div');
+      divT.className = 'insight neutral';
+      divT.textContent = 'Сумма за год (с созданной задачей): ' + parts.join('; ') + '.';
+      yoyTagInsight.appendChild(divT);
+    } else {
+      yoyTagPh.style.display = 'block';
+      yoyTagHost.style.display = 'none';
+    }
+
+    destroyChart('vol');
+    charts.vol = new Chart(document.getElementById('chVolume'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Создано', data: created, backgroundColor: 'rgba(77,163,255,0.65)', borderRadius: 4 },
+          { label: 'Закрыто', data: closed, backgroundColor: 'rgba(52,211,153,0.55)', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    const priKeys = ['Критический', 'Высокий', 'Средний', 'Низкий', 'Не указан'];
+    const colors = {
+      'Критический': 'rgba(248,113,113,0.85)',
+      'Высокий': 'rgba(251,191,36,0.85)',
+      'Средний': 'rgba(77,163,255,0.75)',
+      'Низкий': 'rgba(167,139,250,0.7)',
+      'Не указан': 'rgba(139,149,165,0.6)'
+    };
+    destroyChart('pri');
+    charts.pri = new Chart(document.getElementById('chPriority'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: priKeys.map(pk => ({
+          label: pk,
+          data: monthly.map(m => m.pri[pk] || 0),
+          backgroundColor: colors[pk]
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5', boxWidth: 10 } } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    destroyChart('med');
+    charts.med = new Chart(document.getElementById('chMedian'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Медиана дней',
+          data: monthly.map(m => m.medianDays != null ? m.medianDays : null),
+          borderColor: '#a78bfa',
+          backgroundColor: 'rgba(167,139,250,0.15)',
+          fill: true,
+          tension: 0.25,
+          spanGaps: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    destroyChart('sla');
+    charts.sla = new Chart(document.getElementById('chSLA'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: '≤ 1 день', data: monthly.map(m => m.sla1 != null ? m.sla1 * 100 : null), borderColor: '#34d399', tension: 0.2 },
+          { label: '≤ 3 дня', data: monthly.map(m => m.sla3 != null ? m.sla3 * 100 : null), borderColor: '#4da3ff', tension: 0.2 },
+          { label: '≤ 7 дней', data: monthly.map(m => m.sla7 != null ? m.sla7 * 100 : null), borderColor: '#a78bfa', tension: 0.2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { min: 0, max: 100, ticks: { color: '#8b95a5', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    destroyChart('back');
+    charts.back = new Chart(document.getElementById('chBacklog'), {
+      type: 'line',
+      data: {
+        labels: backlogCum.map(x => monthLabel(x.key)),
+        datasets: [{
+          label: 'Кумулятив (создано − закрыто)',
+          data: backlogCum.map(x => x.value),
+          borderColor: '#fbbf24',
+          backgroundColor: 'rgba(251,191,36,0.1)',
+          fill: true,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8b95a5' } } },
+        scales: {
+          x: { ticks: { color: '#8b95a5', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+        }
+      }
+    });
+
+    const yoy = yoyCompare(monthly, null, YOY_YEARS);
+    destroyChart('yoy');
+    const yoyInsight = document.getElementById('yoyInsight');
+    const yoyPh = document.getElementById('yoyPlaceholder');
+    const yoyHost = document.getElementById('yoyChartHost');
+    yoyInsight.innerHTML = '';
+    const yoyOk = monthly.length > 0 && yoy.labels && yoy.labels.length && yoy.series && yoy.series.length;
+    if (yoyOk) {
+      yoyPh.style.display = 'none';
+      yoyHost.style.display = 'block';
+      charts.yoy = new Chart(document.getElementById('chYoY'), {
+        type: 'bar',
+        data: {
+          labels: yoy.labels,
+          datasets: yoy.series.map(function (s, idx) {
+            return {
+              label: 'Создано в ' + s.year + ' г.',
+              data: s.data,
+              backgroundColor: YOY_BAR_COLORS[idx % YOY_BAR_COLORS.length],
+              borderRadius: 4
+            };
+          })
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#8b95a5' } }, tooltip: { mode: 'index', intersect: false } },
+          datasets: { bar: { maxBarThickness: 18 } },
+          scales: {
+            x: { ticks: { color: '#8b95a5' }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: '#8b95a5' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+          }
+        }
+      });
+      const sums = yoy.series.map(function (s) {
+        return { year: s.year, sum: s.data.reduce(function (a, b) { return a + (b || 0); }, 0) };
+      });
+      const div = document.createElement('div');
+      div.className = 'insight neutral';
+      div.textContent = 'Сумма созданных за год (сумма 12 месяцев на графике): ' +
+        sums.map(function (x) { return x.year + ' — ' + x.sum + ' обр.'; }).join('; ') + '.';
+      yoyInsight.appendChild(div);
+    } else {
+      yoyPh.style.display = 'block';
+      yoyHost.style.display = 'none';
+    }
+
+    const thead = document.querySelector('#monthTable thead');
+    const tbody = document.querySelector('#monthTable tbody');
+    thead.innerHTML = '<tr><th>Месяц</th><th>Создано</th><th>Закрыто</th><th>% с созд. задачей</th><th>Мед.дн (все)</th><th>Мед.дн, с задачей</th><th>Мед.дн, без задачи</th><th>≤1д %</th><th>≤3д %</th><th>&gt;10 дн %</th><th>Крит. %</th></tr>';
+    tbody.innerHTML = monthly.map(m => {
+      let t = 0, c = 0;
+      for (const [k, v] of Object.entries(m.pri)) { t += v; if (k === 'Критический') c += v; }
+      const cp = t ? ((c / t) * 100).toFixed(1) : '—';
+      const pctTag = m.pctWithTask != null ? m.pctWithTask.toFixed(1) : '—';
+      const mwt = m.medianDaysWithTask != null ? m.medianDaysWithTask.toFixed(2) : '—';
+      const mwo = m.medianDaysWithoutTask != null ? m.medianDaysWithoutTask.toFixed(2) : '—';
+      const pct10 = m.pctClosedOver10d != null ? m.pctClosedOver10d.toFixed(1) : '—';
+      return '<tr><td>' + m.label + '</td><td>' + m.created + '</td><td>' + m.closed + '</td><td>' + pctTag + '</td><td>' +
+        (m.medianDays != null ? m.medianDays.toFixed(2) : '—') + '</td><td>' + mwt + '</td><td>' + mwo + '</td><td>' +
+        (m.sla1 != null ? (m.sla1 * 100).toFixed(1) : '—') + '</td><td>' +
+        (m.sla3 != null ? (m.sla3 * 100).toFixed(1) : '—') + '</td><td>' + pct10 + '</td><td>' + cp + '</td></tr>';
+    }).join('');
+  }
+
+  document.getElementById('csvFile').addEventListener('change', function (e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const name = (f.name || '').toLowerCase();
+    const isXlsx = name.endsWith('.xlsx') || name.endsWith('.xlsm') ||
+      (f.type && f.type.indexOf('spreadsheet') >= 0);
+
+    document.getElementById('statusText').textContent = 'Чтение…';
+
+    function applyRows(rows, extraStatus) {
+      const rowsNorm = rowsFromObjectArray(rows);
+      saveRowsToStorage(rowsNorm);
+      document.getElementById('statusText').textContent =
+        'Сохранено и показано: ' + rowsNorm.length + ' обращений' + (extraStatus ? ' · ' + extraStatus : '');
+      render(rowsNorm);
+    }
+
+    if (isXlsx) {
+      loadXlsxFile(f, function (rows, sheetName) {
+        try {
+          applyRows(rows, 'лист: «' + sheetName + '» (первый), строк в таблице: ' + rows.length);
+        } catch (err) {
+          document.getElementById('statusText').textContent = 'Ошибка: ' + err.message;
+          alert(err.message);
+        }
+      }, function (err) {
+        document.getElementById('statusText').textContent = 'Ошибка: ' + err.message;
+        alert(err.message);
+      });
+      return;
+    }
+
+    Papa.parse(f, {
+      header: true,
+      skipEmptyLines: true,
+      complete: function (res) {
+        try {
+          const headers = res.meta.fields || [];
+          const colMap = mapColumns(headers);
+          const rows = rowsFromParsed(res, colMap);
+          saveRowsToStorage(rows);
+          document.getElementById('statusText').textContent =
+            'Сохранено и показано: ' + rows.length + ' строк · колонки: ' + JSON.stringify(colMap);
+          render(rows);
+        } catch (err) {
+          document.getElementById('statusText').textContent = 'Ошибка: ' + err.message;
+          alert(err.message);
+        }
+      },
+      error: function (err) { alert(err.message); }
+    });
+  });
+
+  document.getElementById('btnClearCache').addEventListener('click', function () {
+    if (!confirm('Удалить сохранённые обращения из этого браузера?')) return;
+    try {
+      localStorage.removeItem(LS_KEY_ROWS);
+    } catch (e) {}
+    location.reload();
+  });
+
+  (function initFromEmbeddedOrStorage() {
+    if (typeof window.__EMBEDDED_SUPPORT_ROWS__ !== 'undefined' && window.__EMBEDDED_SUPPORT_ROWS__ && window.__EMBEDDED_SUPPORT_ROWS__.length) {
+      var rowsEmb = deserializeRows(JSON.stringify(window.__EMBEDDED_SUPPORT_ROWS__));
+      document.getElementById('statusText').textContent =
+        'Встроенные данные: ' + rowsEmb.length + ' обращений';
+      render(rowsEmb);
+      return;
+    }
+    var saved = loadRowsFromStorage();
+    if (saved && saved.length) {
+      document.getElementById('statusText').textContent =
+        'Из сохранения: ' + saved.length + ' обращений · загрузите файл снова, чтобы обновить';
+      render(saved);
+    } else {
+      document.getElementById('statusText').textContent =
+        'Нет данных — откройте версию с встроенным JSON или загрузите таблицу';
+    }
+  })();
+})();
+  </script>
+</body>
+</html>
